@@ -2,12 +2,7 @@
   "functions": {
     "api/index.js": {
       "maxDuration": 60,
-      "excludeFiles": [
-        "datasets/**",
-        "models/**",
-        "scripts/**",
-        "public/**"
-      ]
+      "excludeFiles": "{datasets,models,scripts,public}/**"
     }
   },
   "rewrites": [
