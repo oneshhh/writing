@@ -1,0 +1,167 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Real Write • Writer • Earnings</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+    <script src="/shared/config.js"></script>
+    <script src="/shared/app.js"></script>
+    <script src="/shared/topbar.js"></script>
+  </head>
+  <body>
+    <div class="topbar" id="topbar"></div>
+    <div class="wrap wide">
+      <div class="grid">
+        <div class="card">
+          <h2>This Month</h2>
+          <div class="row">
+            <div class="stat">
+              <div class="pill dot green">Paid this month</div>
+              <div class="n" id="nPaidMonth">0</div>
+            </div>
+            <div class="stat">
+              <div class="pill dot amber">Pending this month</div>
+              <div class="n" id="nPendingMonth">0</div>
+            </div>
+            <div class="stat">
+              <div class="pill dot blue">Approved articles</div>
+              <div class="n" id="nApprovedTotal">0</div>
+            </div>
+          </div>
+          <div class="muted" style="margin-top: 8px">Totals are based on payments created for approved articles.</div>
+        </div>
+
+        <div class="card">
+          <h2>Payment History</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Article</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Paid at</th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+          <div class="right" style="margin-top: 12px">
+            <button class="secondary" id="prev">Previous</button>
+            <span class="muted" id="pageInfo"></span>
+            <button class="secondary" id="next">Next</button>
+          </div>
+          <div class="muted" id="msg" style="margin-top: 10px"></div>
+        </div>
+      </div>
+    </div>
+    <script>
+      (async function () {
+        const user = await APP.requireRole("writer");
+        if (!user) return;
+        await renderTopbar({
+          role: user.role,
+          links: [
+            { href: "/writer/dashboard.html", label: "Dashboard" },
+            { href: "/writer/earnings.html", label: "Earnings" }
+          ]
+        });
+
+        const msg = (t) => (document.getElementById("msg").textContent = t || "");
+
+        APP.ui.textSkeleton("nPaidMonth", { kind: "num", width: "54%" });
+        APP.ui.textSkeleton("nPendingMonth", { kind: "num", width: "54%" });
+        APP.ui.textSkeleton("nApprovedTotal", { kind: "num", width: "54%" });
+        APP.ui.textSkeleton("pageInfo", { kind: "line", width: "120px" });
+
+        const pageSize = 20;
+        let offset = 0;
+        let total = null;
+
+        const startOfMonth = () => {
+          const d = new Date();
+          return new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
+        };
+        const inThisMonth = (iso) => {
+          if (!iso) return false;
+          return new Date(iso).getTime() >= startOfMonth().getTime();
+        };
+
+        const sum = (rows) => rows.reduce((a, p) => a + Number(p.amount || 0), 0);
+
+        function calcAndRenderSummary(allPayments) {
+          const monthPaid = (allPayments || []).filter((p) => inThisMonth(p.created_at) && p.status === "paid");
+          const monthPending = (allPayments || []).filter((p) => inThisMonth(p.created_at) && p.status === "pending");
+          const approvedTotal = (allPayments || []).length;
+
+          const paidAmt = sum(monthPaid);
+          const pendingAmt = sum(monthPending);
+
+          document.getElementById("nPaidMonth").textContent = `₹${paidAmt.toFixed(0)}`;
+          document.getElementById("nPendingMonth").textContent = `₹${pendingAmt.toFixed(0)}`;
+          document.getElementById("nApprovedTotal").textContent = String(approvedTotal);
+        }
+
+        function renderRows(rows) {
+          document.getElementById("rows").innerHTML = (rows || [])
+            .map((p) => {
+              const a = p.articles;
+              const title = a?.title || "Article";
+              const uid = a?.unique_id || p.article_id;
+              const status = a?.status || "-";
+              return `<tr>
+                <td>
+                  <div style="font-weight:750">${APP.escapeHtml(title)}</div>
+                  <div class="muted">${APP.escapeHtml(uid)} • ${APP.escapeHtml(status)}</div>
+                </td>
+                <td>₹${APP.escapeHtml(Number(p.amount || 0).toFixed(0))}</td>
+                <td>${
+                  p.status === "paid"
+                    ? "<span class='badge b-approved'>paid</span>"
+                    : "<span class='badge b-submitted'>pending</span>"
+                }</td>
+                <td class="muted">${APP.escapeHtml(new Date(p.created_at).toLocaleString())}</td>
+                <td class="muted">${p.paid_at ? APP.escapeHtml(new Date(p.paid_at).toLocaleString()) : "-"}</td>
+              </tr>`;
+            })
+            .join("");
+        }
+
+        function updatePager() {
+          const page = Math.floor(offset / pageSize) + 1;
+          const pages = total ? Math.max(1, Math.ceil(total / pageSize)) : null;
+          document.getElementById("prev").disabled = offset <= 0;
+          document.getElementById("next").disabled = total != null ? offset + pageSize >= total : false;
+          document.getElementById("pageInfo").textContent = pages ? `Page ${page} of ${pages}` : `Page ${page}`;
+        }
+
+        async function loadPage() {
+          APP.ui.tableSkeleton("rows", { rows: 10, cols: 5 });
+          const out = await APP.apiFetch(`/api/payments?limit=${pageSize}&offset=${offset}`);
+          total = out.total ?? total;
+          renderRows(out.payments || []);
+          updatePager();
+        }
+
+        try {
+          // Summary (best-effort): grab the first 500 for quick totals
+          const first = await APP.apiFetch("/api/payments?limit=500&offset=0");
+          calcAndRenderSummary(first.payments || []);
+
+          document.getElementById("prev").onclick = async () => {
+            offset = Math.max(0, offset - pageSize);
+            await loadPage();
+          };
+          document.getElementById("next").onclick = async () => {
+            offset = offset + pageSize;
+            await loadPage();
+          };
+
+          await loadPage();
+        } catch (e) {
+          msg(e.message || String(e));
+        }
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>LexisFlow | Admin Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Literata:wght@500;600&amp;family=Geist:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-bright": "#fcf9f8",
+                    "on-tertiary-fixed": "#181c1e",
+                    "on-surface-variant": "#414845",
+                    "on-primary": "#ffffff",
+                    "secondary-container": "#e1e3e4",
+                    "on-primary-fixed": "#022018",
+                    "on-secondary-container": "#626566",
+                    "on-error": "#ffffff",
+                    "primary-fixed-dim": "#adcec0",
+                    "inverse-primary": "#adcec0",
+                    "secondary-fixed": "#e1e3e4",
+                    "on-secondary-fixed-variant": "#454748",
+                    "primary-fixed": "#c9eadc",
+                    "on-primary-container": "#759487",
+                    "inverse-on-surface": "#f3f0ef",
+                    "primary-container": "#0d2b22",
+                    "error": "#ba1a1a",
+                    "on-error-container": "#93000a",
+                    "on-tertiary-container": "#8a8e91",
+                    "secondary": "#5c5f60",
+                    "tertiary": "#0e1214",
+                    "surface": "#fcf9f8",
+                    "surface-container": "#f0eded",
+                    "tertiary-fixed-dim": "#c4c7ca",
+                    "on-secondary": "#ffffff",
+                    "background": "#fcf9f8",
+                    "secondary-fixed-dim": "#c5c7c8",
+                    "surface-dim": "#dcd9d9",
+                    "on-primary-fixed-variant": "#2f4c42",
+                    "on-tertiary-fixed-variant": "#43474a",
+                    "surface-variant": "#e5e2e1",
+                    "surface-container-high": "#eae7e7",
+                    "surface-tint": "#476459",
+                    "on-surface": "#1c1b1b",
+                    "tertiary-container": "#232729",
+                    "surface-container-highest": "#e5e2e1",
+                    "outline-variant": "#c1c8c3",
+                    "surface-container-low": "#f6f3f2",
+                    "inverse-surface": "#313030",
+                    "tertiary-fixed": "#e0e3e6",
+                    "primary": "#00150e",
+                    "on-tertiary": "#ffffff",
+                    "outline": "#727975",
+                    "surface-container-lowest": "#ffffff",
+                    "error-container": "#ffdad6",
+                    "on-secondary-fixed": "#191c1d",
+                    "on-background": "#1c1b1b"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "margin-mobile": "16px",
+                    "xs": "0.5rem",
+                    "margin-desktop": "48px",
+                    "lg": "2.5rem",
+                    "sm": "1rem",
+                    "md": "1.5rem",
+                    "xl": "4rem",
+                    "gutter": "24px",
+                    "base": "4px"
+            },
+            "fontFamily": {
+                    "headline-md": ["Literata"],
+                    "label-sm": ["Geist"],
+                    "body-md": ["Geist"],
+                    "body-lg": ["Geist"],
+                    "display-lg-mobile": ["Literata"],
+                    "display-lg": ["Literata"],
+                    "interface-md": ["Geist"]
+            },
+            "fontSize": {
+                    "headline-md": ["24px", {"lineHeight": "1.4", "fontWeight": "500"}],
+                    "label-sm": ["12px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "display-lg-mobile": ["32px", {"lineHeight": "1.25", "fontWeight": "600"}],
+                    "display-lg": ["48px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                    "interface-md": ["14px", {"lineHeight": "1.2", "fontWeight": "500"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Geist', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .sidebar-active {
+            box-shadow: inset 4px 0 0 0 #00150e; /* Fallback for active state if border-l isn't enough */
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background antialiased overflow-x-hidden">
+<!-- Top Navigation Header -->
+<header class="sticky top-0 z-50 flex justify-between items-center w-full px-margin-desktop py-4 bg-surface dark:bg-tertiary">
+<div class="flex items-center gap-8">
+<span class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed">LexisFlow</span>
+<nav class="hidden md:flex gap-6">
+<a class="text-primary dark:text-primary-fixed font-bold border-b-2 border-primary font-label-sm text-label-sm transition-all" href="#">Overview</a>
+<a class="text-secondary dark:text-secondary-fixed-dim hover:text-primary-fixed-variant dark:hover:text-primary-fixed transition-colors font-label-sm text-label-sm" href="#">Analytics</a>
+<a class="text-secondary dark:text-secondary-fixed-dim hover:text-primary-fixed-variant dark:hover:text-primary-fixed transition-colors font-label-sm text-label-sm" href="#">Reports</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="hidden md:flex items-center bg-surface-container rounded-full px-4 py-2">
+<span class="material-symbols-outlined text-outline text-[20px]" data-icon="search">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-body-md font-body-md px-2 w-48" placeholder="Search systems..." type="text"/>
+</div>
+<button class="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-container text-on-primary-container font-interface-md text-interface-md transition-all hover:opacity-90">
+<span class="material-symbols-outlined text-[18px]" data-icon="add_circle">add_circle</span>
+<span>Create</span>
+</button>
+<div class="relative group">
+<img alt="User avatar" class="w-10 h-10 rounded-full border-2 border-outline-variant cursor-pointer object-cover" data-alt="A professional headshot of a female administrator with a focused and intelligent expression. She is in a minimalist, softly lit office environment with neutral tones and clean lines. The lighting is natural and high-key, creating a bright and airy atmosphere consistent with a modern, high-end editorial management interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBlU9gvY6_kLOd8uEi3H2t-CkordEeiTzq2MuF2lwonIPbLZf4vgS7CvRiFxx80u8mZUuW-7akQver7nLWWYSW33XmDCgpkzOR9se_eAVV363eDETkqr1NMi9VAseXdR34H2MrJ6I5nPYZTPNn8Eoybhllg5aDZlq0gFZF7Vg9isR5xB6T8TvENP1AiGCJzfbPiDFeeumsxW4UabrYz5mRSTNIiNINdGMZKjtHMt4MGuR5cXp9cmtwV7KnymrBfo5XXdqRgUlxHwrA"/>
+</div>
+</div>
+</header>
+<!-- Sidebar Navigation -->
+<aside class="fixed left-0 top-0 h-full w-[280px] hidden md:flex flex-col py-md border-r border-outline-variant dark:border-on-tertiary-container bg-surface-container-low dark:bg-tertiary-container z-40 pt-24">
+<div class="px-6 mb-8">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-primary-container flex items-center justify-center rounded-lg">
+<span class="material-symbols-outlined text-on-primary-container" data-icon="hub">hub</span>
+</div>
+<div>
+<div class="font-headline-md text-headline-md text-primary dark:text-primary-fixed scale-75 origin-left">Editorial Hub</div>
+<div class="font-label-sm text-label-sm text-on-secondary-container">Enterprise Tier</div>
+</div>
+</div>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 text-primary dark:text-primary-fixed-dim font-bold border-l-2 border-primary dark:border-primary-fixed-dim pl-4 py-2 bg-surface-container-high dark:bg-tertiary scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-label-sm text-label-sm">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 text-secondary dark:text-on-tertiary-container pl-4 py-2 hover:bg-surface-container transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="folder_copy">folder_copy</span>
+<span class="font-label-sm text-label-sm">Projects</span>
+</a>
+<a class="flex items-center gap-3 text-secondary dark:text-on-tertiary-container pl-4 py-2 hover:bg-surface-container transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="description">description</span>
+<span class="font-label-sm text-label-sm">Articles</span>
+</a>
+<a class="flex items-center gap-3 text-secondary dark:text-on-tertiary-container pl-4 py-2 hover:bg-surface-container transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="groups">groups</span>
+<span class="font-label-sm text-label-sm">Team</span>
+</a>
+<a class="flex items-center gap-3 text-secondary dark:text-on-tertiary-container pl-4 py-2 hover:bg-surface-container transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+<span class="font-label-sm text-label-sm">Payments</span>
+</a>
+<a class="flex items-center gap-3 text-secondary dark:text-on-tertiary-container pl-4 py-2 hover:bg-surface-container transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-label-sm text-label-sm">Settings</span>
+</a>
+</nav>
+<div class="px-4 mt-auto space-y-1">
+<a class="flex items-center gap-3 text-secondary dark:text-on-tertiary-container pl-4 py-2 hover:bg-surface-container transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+<span class="font-label-sm text-label-sm">Help Center</span>
+</a>
+<a class="flex items-center gap-3 text-secondary dark:text-on-tertiary-container pl-4 py-2 hover:bg-surface-container transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span class="font-label-sm text-label-sm">Log Out</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="md:ml-[280px] p-margin-mobile md:p-margin-desktop bg-surface-bright min-h-screen">
+<!-- Welcome Section -->
+<header class="mb-12">
+<h1 class="font-display-lg text-display-lg text-primary mb-2">Systems Overview</h1>
+<p class="font-body-lg text-body-lg text-secondary max-w-2xl">Good morning, Admin. Here is the latest activity across the LexisFlow enterprise ecosystem.</p>
+</header>
+<!-- KPI Grid (Bento Style) -->
+<section class="grid grid-cols-1 md:grid-cols-12 gap-gutter mb-12">
+<!-- Total Users Card -->
+<div class="md:col-span-4 bg-white border border-outline-variant p-md rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] transition-all">
+<div class="flex justify-between items-start mb-6">
+<div class="p-3 bg-primary-fixed rounded-lg">
+<span class="material-symbols-outlined text-on-primary-fixed" data-icon="person">person</span>
+</div>
+<span class="font-label-sm text-label-sm text-primary uppercase bg-primary-fixed-dim/20 px-2 py-1 rounded">Real-time</span>
+</div>
+<div class="font-display-lg text-display-lg text-primary leading-tight">12,482</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant uppercase mt-1">Total Active Users</div>
+<div class="mt-4 flex items-center gap-2 text-primary">
+<span class="material-symbols-outlined text-[16px]" data-icon="trending_up">trending_up</span>
+<span class="font-interface-md text-interface-md">+14% this month</span>
+</div>
+</div>
+<!-- Total Projects Card -->
+<div class="md:col-span-4 bg-white border border-outline-variant p-md rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] transition-all">
+<div class="flex justify-between items-start mb-6">
+<div class="p-3 bg-surface-container-high rounded-lg">
+<span class="material-symbols-outlined text-primary" data-icon="folder">folder</span>
+</div>
+</div>
+<div class="font-display-lg text-display-lg text-primary leading-tight">1,204</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant uppercase mt-1">Managed Projects</div>
+<div class="mt-4 flex items-center gap-2 text-secondary">
+<span class="font-interface-md text-interface-md">86 currently active</span>
+</div>
+</div>
+<!-- Total Articles Card -->
+<div class="md:col-span-4 bg-white border border-outline-variant p-md rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] transition-all">
+<div class="flex justify-between items-start mb-6">
+<div class="p-3 bg-secondary-container rounded-lg">
+<span class="material-symbols-outlined text-on-secondary-container" data-icon="article">article</span>
+</div>
+</div>
+<div class="font-display-lg text-display-lg text-primary leading-tight">45.2k</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant uppercase mt-1">Articles Published</div>
+<div class="mt-4 flex items-center gap-2 text-primary">
+<span class="material-symbols-outlined text-[16px]" data-icon="auto_awesome">auto_awesome</span>
+<span class="font-interface-md text-interface-md">AI Checks: 98% pass</span>
+</div>
+</div>
+</section>
+<!-- Secondary Layout: Insights & Quick Actions -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-gutter">
+<!-- Quick Links (Asymmetric Layout) -->
+<section class="md:col-span-4 space-y-6">
+<h2 class="font-headline-md text-headline-md text-primary">Quick Management</h2>
+<a class="group block p-6 bg-surface-container-low border border-outline-variant rounded-lg hover:border-primary transition-all" href="#">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-primary" data-icon="manage_accounts">manage_accounts</span>
+<span class="font-body-lg text-body-lg font-medium text-primary">User Management</span>
+</div>
+<span class="material-symbols-outlined text-outline group-hover:text-primary transform group-hover:translate-x-1 transition-all" data-icon="chevron_right">chevron_right</span>
+</div>
+</a>
+<a class="group block p-6 bg-surface-container-low border border-outline-variant rounded-lg hover:border-primary transition-all" href="#">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-primary" data-icon="settings_suggest">settings_suggest</span>
+<span class="font-body-lg text-body-lg font-medium text-primary">System Settings</span>
+</div>
+<span class="material-symbols-outlined text-outline group-hover:text-primary transform group-hover:translate-x-1 transition-all" data-icon="chevron_right">chevron_right</span>
+</div>
+</a>
+<div class="p-6 bg-primary-container text-on-primary rounded-lg relative overflow-hidden h-48 flex flex-col justify-end">
+<div class="absolute -right-8 -top-8 opacity-20">
+<span class="material-symbols-outlined text-[140px]" data-icon="auto_stories">auto_stories</span>
+</div>
+<div class="relative z-10">
+<h3 class="font-headline-md text-headline-md mb-2">Editor's Guide</h3>
+<p class="font-body-md text-body-md opacity-80 mb-4">View our updated compliance guidelines for 2024.</p>
+<button class="bg-on-primary text-primary px-4 py-2 rounded font-interface-md text-interface-md w-max">Download PDF</button>
+</div>
+</div>
+</section>
+<!-- Activity Feed / Data List -->
+<section class="md:col-span-8">
+<div class="bg-white border border-outline-variant rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.04)] overflow-hidden">
+<div class="px-6 py-6 border-b border-outline-variant flex justify-between items-center">
+<h2 class="font-headline-md text-headline-md text-primary">Recent System Activity</h2>
+<button class="font-label-sm text-label-sm text-secondary hover:text-primary transition-colors flex items-center gap-1 uppercase">
+                            View All <span class="material-symbols-outlined text-[14px]" data-icon="open_in_new">open_in_new</span>
+</button>
+</div>
+<div class="divide-y divide-outline-variant">
+<!-- Activity Item 1 -->
+<div class="px-6 py-4 flex items-center justify-between hover:bg-surface-container-lowest transition-colors">
+<div class="flex items-center gap-4">
+<img alt="Activity user" class="w-10 h-10 rounded-full" data-alt="A close-up portrait of a male team member with a warm smile, set against a blurred background of a minimalist, white-walled contemporary workspace. The lighting is soft and even, emphasizing professional approachability and clarity in a premium digital workplace setting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC3Pn73uUHKgYBbTf3uzGG2LsCuBSopw2oU5EP-xHeEFltJq7VfpntS7aZLcdZ8I5nc7XgTsD2W616xsGtQ1EjEHhxF0Ojl_vY4X59Hv5vCgFGXHTjNOj1DeoU-roZ-D_bvLa1iwtYSnejvbejkmDN8bB7Dd9PYH-DACSJ1I8Lu2ecIWLW9e5IuBEzroH1Y30eO3t_1DbrhFmYPIYzm-8LaIIElxQjyKBQyMrCE4BWMi7624VJ9fki7WWPkwpVRo1gWq8N1Guvj6MU"/>
+<div>
+<div class="font-body-md text-body-md font-medium text-primary">Marcus Thorne <span class="font-normal text-secondary">published</span> "The Future of AI Typography"</div>
+<div class="font-label-sm text-label-sm text-outline">2 minutes ago • Projects / Innovation</div>
+</div>
+</div>
+<span class="px-2 py-1 rounded bg-secondary-container text-on-secondary-container font-label-sm text-label-sm">Article</span>
+</div>
+<!-- Activity Item 2 -->
+<div class="px-6 py-4 flex items-center justify-between hover:bg-surface-container-lowest transition-colors">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 bg-error-container text-error flex items-center justify-center rounded-full">
+<span class="material-symbols-outlined" data-icon="warning">warning</span>
+</div>
+<div>
+<div class="font-body-md text-body-md font-medium text-primary">System Alert <span class="font-normal text-secondary">detected</span> high latency in API Gateway</div>
+<div class="font-label-sm text-label-sm text-outline">15 minutes ago • Infrastructure</div>
+</div>
+</div>
+<span class="px-2 py-1 rounded bg-error-container text-on-error-container font-label-sm text-label-sm uppercase">Critical</span>
+</div>
+<!-- Activity Item 3 -->
+<div class="px-6 py-4 flex items-center justify-between hover:bg-surface-container-lowest transition-colors">
+<div class="flex items-center gap-4">
+<img alt="Activity user" class="w-10 h-10 rounded-full" data-alt="A portrait of a male professional in his 40s wearing stylish glasses, looking thoughtfully at the camera. The background is a clean, minimalist interior with a hint of architectural detail. The color palette consists of cool grays and crisp whites, echoing the sophisticated focus-first design of the editorial platform." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAqrA6jTc5qqvAhv_r6Bb4MkdqvpRe9XtNvqn58QPImJsxzGUHgvbyOQneIM0x9_esdaihrNleXcmQm-a7FK1ig0vYiqJs0nW32djkv8nL-bQql4ZaUANWEWHUn8XRAI07CGarPKF5rmE-XRe1XpT7LaeTHTFPrmvkyXMGeEbKWQSzxDcpbM4NfsdNRTIHFtveLK1vUhERYhTFftEe1H6Uf7zl8U4XV-Jl9owUKQo2pQceutLOoxquvBLB6zCGqmOBDOmQCEoLaQnk"/>
+<div>
+<div class="font-body-md text-body-md font-medium text-primary">Dr. Elena Fisher <span class="font-normal text-secondary">started</span> New Project "Ethics in LLMs"</div>
+<div class="font-label-sm text-label-sm text-outline">1 hour ago • Projects / Research</div>
+</div>
+</div>
+<span class="px-2 py-1 rounded bg-primary-fixed-dim text-on-primary-fixed-variant font-label-sm text-label-sm">Project</span>
+</div>
+<!-- Activity Item 4 -->
+<div class="px-6 py-4 flex items-center justify-between hover:bg-surface-container-lowest transition-colors">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 bg-surface-container-high text-primary flex items-center justify-center rounded-full">
+<span class="material-symbols-outlined" data-icon="verified_user">verified_user</span>
+</div>
+<div>
+<div class="font-body-md text-body-md font-medium text-primary">Security Audit <span class="font-normal text-secondary">completed</span> for User Roles</div>
+<div class="font-label-sm text-label-sm text-outline">3 hours ago • Compliance</div>
+</div>
+</div>
+<span class="px-2 py-1 rounded bg-secondary-container text-on-secondary-container font-label-sm text-label-sm">System</span>
+</div>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- Mobile Bottom Navigation Shell (Suppressed on large screens by Shared Component Logic) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full bg-surface border-t border-outline-variant flex justify-around py-3 px-margin-mobile z-50">
+<button class="flex flex-col items-center gap-1 text-primary">
+<span class="material-symbols-outlined" data-icon="dashboard" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-label-sm text-[10px]">Home</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-secondary">
+<span class="material-symbols-outlined" data-icon="folder_copy">folder_copy</span>
+<span class="font-label-sm text-[10px]">Projects</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-secondary">
+<span class="material-symbols-outlined" data-icon="groups">groups</span>
+<span class="font-label-sm text-[10px]">Team</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-secondary">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-label-sm text-[10px]">Settings</span>
+</button>
+</nav>
+<script>
+        // Micro-interactions for hover effects and dynamic UI updates
+        document.querySelectorAll('a, button').forEach(el => {
+            el.addEventListener('mousedown', () => {
+                el.classList.add('scale-95');
+                setTimeout(() => el.classList.remove('scale-95'), 150);
+            });
+        });
+
+        // Simple visibility observer for scroll header transparency effect
+        const header = document.querySelector('header');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 20) {
+                header.classList.add('shadow-sm');
+                header.classList.remove('py-4');
+                header.classList.add('py-2');
+            } else {
+                header.classList.remove('shadow-sm');
+                header.classList.remove('py-2');
+                header.classList.add('py-4');
+            }
+        });
+    </script>
+</body></html>

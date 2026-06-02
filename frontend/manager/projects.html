@@ -1,0 +1,87 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Real Write • Manager • Projects</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+    <script src="/shared/config.js"></script>
+    <script src="/shared/app.js"></script>
+    <script src="/shared/topbar.js"></script>
+  </head>
+  <body>
+    <div class="topbar" id="topbar"></div>
+    <div class="wrap">
+      <div class="grid">
+        <div class="card" style="grid-column: span 6">
+          <h2>Create Project</h2>
+          <div>
+            <label class="muted">Title</label>
+            <input id="title" />
+          </div>
+          <div style="margin-top: 10px">
+            <label class="muted">Description</label>
+            <textarea id="desc"></textarea>
+          </div>
+          <div class="two" style="margin-top: 10px">
+            <label class="pill"><input type="checkbox" id="ai" /> AI check enabled</label>
+            <label class="pill"><input type="checkbox" id="plag" /> Plagiarism check enabled</label>
+          </div>
+          <div class="right" style="margin-top: 12px">
+            <button id="create">Create</button>
+          </div>
+          <div class="muted" id="msg" style="margin-top: 10px"></div>
+        </div>
+        <div class="card" style="grid-column: span 6">
+          <h2>My Projects</h2>
+          <table>
+            <thead><tr><th>Title</th><th>Status</th><th></th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <script>
+      (async function () {
+        const user = await APP.requireRole("manager");
+        if (!user) return;
+        await renderTopbar({ role: user.role, links: [{ href: "/manager/dashboard.html", label: "Dashboard" }] });
+
+        async function refresh() {
+          APP.ui.tableSkeleton("rows", { rows: 8, cols: 3 });
+          const projects = await APP.apiFetch("/api/projects");
+          document.getElementById("rows").innerHTML = (projects.projects || [])
+            .map((p) => `<tr>
+              <td>${APP.escapeHtml(p.title)}</td>
+              <td class="muted">${APP.escapeHtml(p.status)}</td>
+              <td class="right"><a href="/manager/project-detail.html?id=${encodeURIComponent(p.id)}"><button class="secondary">Open</button></a></td>
+            </tr>`)
+            .join("");
+        }
+        await refresh();
+
+        const msg = (t) => (document.getElementById("msg").textContent = t || "");
+        document.getElementById("create").onclick = async () => {
+          msg("");
+          try {
+            const body = {
+              title: document.getElementById("title").value.trim(),
+              description: document.getElementById("desc").value,
+              ai_check_enabled: document.getElementById("ai").checked,
+              plagiarism_check_enabled: document.getElementById("plag").checked
+            };
+            await APP.apiFetch("/api/projects", { method: "POST", body: JSON.stringify(body) });
+            document.getElementById("title").value = "";
+            document.getElementById("desc").value = "";
+            document.getElementById("ai").checked = false;
+            document.getElementById("plag").checked = false;
+            await refresh();
+            msg("Created.");
+          } catch (e) {
+            msg(e.message || String(e));
+          }
+        };
+      })();
+    </script>
+  </body>
+</html>

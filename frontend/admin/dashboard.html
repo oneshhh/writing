@@ -1,0 +1,223 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Real Write • Admin • Dashboard</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+    <script src="/shared/config.js"></script>
+    <script src="/shared/app.js"></script>
+    <script src="/shared/topbar.js"></script>
+  </head>
+  <body>
+    <div class="topbar" id="topbar"></div>
+    <div class="wrap wide">
+      <div class="grid">
+        <div class="card">
+          <h3 id="welcome" style="margin:0"></h3>
+          <div class="muted" style="margin-top:6px">System overview: projects, articles, and payments.</div>
+        </div>
+
+        <div class="card">
+          <h2>Projects</h2>
+          <table>
+            <thead><tr><th>Title</th><th>Status</th><th>Created</th><th></th></tr></thead>
+            <tbody id="projectRows"></tbody>
+          </table>
+          <div class="right" style="margin-top: 12px">
+            <a href="/admin/projects.html"><button class="secondary" type="button">View all projects</button></a>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Articles</h2>
+          <div class="two" style="margin: 10px 0 12px 0; align-items:end;">
+            <div>
+              <label class="muted">Project filter</label>
+              <select id="projectFilter"></select>
+            </div>
+            <div>
+              <label class="muted">Search</label>
+              <input id="q" placeholder="Search by title or article ID..." />
+            </div>
+          </div>
+          <table>
+            <thead><tr><th>Title</th><th>Writer</th><th>Status</th><th>Payment</th><th>Updated</th><th></th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+          <div class="right" style="margin-top: 12px">
+            <button class="secondary" id="prev">Previous</button>
+            <span class="muted" id="pageInfo"></span>
+            <button class="secondary" id="next">Next</button>
+          </div>
+          <div class="muted" id="msg" style="margin-top: 10px"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (async function () {
+        const user = await APP.requireRole("admin");
+        if (!user) return;
+        await renderTopbar({
+          role: user.role,
+          links: [
+            { href: "/admin/dashboard.html", label: "Dashboard" },
+            { href: "/admin/users.html", label: "Users" },
+            { href: "/admin/projects.html", label: "Projects" },
+            { href: "/admin/payments.html", label: "Payments" }
+          ]
+        });
+
+        document.getElementById("welcome").textContent = `Welcome, ${user.full_name || "Admin"}`;
+        const msg = (t) => (document.getElementById("msg").textContent = t || "");
+
+        const pageSize = 10;
+        let offset = 0;
+        let total = null;
+        let projects = [];
+
+        APP.ui.tableSkeleton("projectRows", { rows: 6, cols: 4 });
+        APP.ui.tableSkeleton("rows", { rows: 8, cols: 6 });
+        APP.ui.textSkeleton("pageInfo", { kind: "line", width: "120px" });
+
+        const projectFilter = document.getElementById("projectFilter");
+        const searchInput = document.getElementById("q");
+
+        function updatePager() {
+          const page = Math.floor(offset / pageSize) + 1;
+          const pages = total ? Math.max(1, Math.ceil(total / pageSize)) : null;
+          document.getElementById("prev").disabled = offset <= 0;
+          document.getElementById("next").disabled = total != null ? offset + pageSize >= total : false;
+          document.getElementById("pageInfo").textContent = pages ? `Page ${page} of ${pages}` : `Page ${page}`;
+        }
+
+        async function loadProjects() {
+          const out = await APP.apiFetch("/api/projects");
+          projects = out.projects || [];
+
+          projectFilter.innerHTML = [`<option value="">All projects</option>`]
+            .concat(projects.map((p) => `<option value="${p.id}">${APP.escapeHtml(p.title)}</option>`))
+            .join("");
+
+          document.getElementById("projectRows").innerHTML = projects
+            .slice(0, 10)
+            .map(
+              (p) => `<tr>
+                <td>${APP.escapeHtml(p.title)}</td>
+                <td class="muted">${APP.escapeHtml(p.status || "")}</td>
+                <td class="muted">${APP.escapeHtml(new Date(p.created_at).toLocaleString())}</td>
+                <td class="right"><a href="/admin/project-detail.html?id=${encodeURIComponent(p.id)}"><button class="secondary" type="button">Open</button></a></td>
+              </tr>`
+            )
+            .join("");
+        }
+
+        async function hydrate(usersById, paymentsByArticleId, articles) {
+          const projectName = new Map((projects || []).map((p) => [p.id, p.title]));
+          document.getElementById("rows").innerHTML = (articles || [])
+            .map((a) => {
+              const u = usersById.get(a.writer_id);
+              const p = paymentsByArticleId.get(a.id);
+              const paid = p && p.status === "paid";
+              const payText = p
+                ? `${paid ? "paid" : "pending"} • ₹${Number(p.amount || 0).toFixed(0)}`
+                : "—";
+              return `<tr>
+                <td>
+                  <div style="font-weight:800">${APP.escapeHtml(a.title || "")}</div>
+                  <div class="muted">${APP.escapeHtml(a.unique_id || a.id)} • ${APP.escapeHtml(projectName.get(a.project_id) || "")}</div>
+                </td>
+                <td>
+                  <div style="font-weight:750">${APP.escapeHtml(u?.full_name || "—")}</div>
+                  <div class="muted">${APP.escapeHtml(u?.email || "")}</div>
+                </td>
+                <td>${APP.badgeForStatus(a.status)}</td>
+                <td>${p ? (paid ? "<span class='badge b-approved'>paid</span>" : "<span class='badge b-submitted'>pending</span>") : "<span class='badge b-draft'>n/a</span>"}<div class="muted" style="margin-top:4px">${APP.escapeHtml(payText)}</div></td>
+                <td class="muted">${APP.escapeHtml(new Date(a.updated_at || a.created_at).toLocaleString())}</td>
+                <td class="right"><button class="danger" data-del="${a.id}">Delete</button></td>
+              </tr>`;
+            })
+            .join("");
+
+          for (const b of document.querySelectorAll("button[data-del]")) {
+            b.onclick = async () => {
+              const id = b.getAttribute("data-del");
+              const ok = confirm("Delete this article? This cannot be undone.");
+              if (!ok) return;
+              msg("");
+              try {
+                await APP.apiFetch(`/api/articles/${encodeURIComponent(id)}`, { method: "DELETE" });
+                await loadArticles();
+                msg("Deleted.");
+              } catch (e) {
+                msg(e.message || String(e));
+              }
+            };
+          }
+        }
+
+        async function loadArticles() {
+          msg("");
+          APP.ui.tableSkeleton("rows", { rows: 8, cols: 6 });
+          const qs = new URLSearchParams();
+          qs.set("limit", String(pageSize));
+          qs.set("offset", String(offset));
+          const pid = projectFilter.value || "";
+          const q = String(searchInput.value || "").trim();
+          if (pid) qs.set("project_id", pid);
+          if (q) qs.set("q", q);
+
+          const out = await APP.apiFetch(`/api/articles/admin/list?${qs.toString()}`);
+          total = out.total ?? total;
+          const articles = out.articles || [];
+          updatePager();
+
+          const writerIds = Array.from(new Set(articles.map((a) => a.writer_id).filter(Boolean)));
+          const articleIds = articles.map((a) => a.id);
+
+          const [usersResp, paymentsResp] = await Promise.all([
+            writerIds.length ? APP.apiFetch(`/api/users/by-ids?ids=${encodeURIComponent(writerIds.join(","))}`) : Promise.resolve({ users: [] }),
+            articleIds.length ? APP.apiFetch(`/api/payments/by-article-ids?ids=${encodeURIComponent(articleIds.join(","))}`) : Promise.resolve({ payments: [] })
+          ]);
+
+          const usersById = new Map((usersResp.users || []).map((u) => [u.id, u]));
+          const paymentsByArticleId = new Map();
+          for (const p of paymentsResp.payments || []) {
+            if (!paymentsByArticleId.has(p.article_id)) paymentsByArticleId.set(p.article_id, p);
+          }
+
+          await hydrate(usersById, paymentsByArticleId, articles);
+        }
+
+        document.getElementById("prev").onclick = async () => {
+          offset = Math.max(0, offset - pageSize);
+          await loadArticles();
+        };
+        document.getElementById("next").onclick = async () => {
+          offset = offset + pageSize;
+          await loadArticles();
+        };
+        projectFilter.onchange = async () => {
+          offset = 0;
+          await loadArticles();
+        };
+        let t = null;
+        searchInput.oninput = async () => {
+          if (t) clearTimeout(t);
+          t = setTimeout(async () => {
+            offset = 0;
+            await loadArticles();
+          }, 250);
+        };
+
+        try {
+          await loadProjects();
+          await loadArticles();
+        } catch (e) {
+          msg(e.message || String(e));
+        }
+      })();
+    </script>
+  </body>
+</html>

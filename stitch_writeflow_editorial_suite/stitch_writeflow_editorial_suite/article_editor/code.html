@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@6..72,400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-bright": "#fcf9f8",
+                    "on-tertiary-fixed": "#181c1e",
+                    "on-surface-variant": "#414845",
+                    "on-primary": "#ffffff",
+                    "secondary-container": "#e1e3e4",
+                    "on-primary-fixed": "#022018",
+                    "on-secondary-container": "#626566",
+                    "on-error": "#ffffff",
+                    "primary-fixed-dim": "#adcec0",
+                    "inverse-primary": "#adcec0",
+                    "secondary-fixed": "#e1e3e4",
+                    "on-secondary-fixed-variant": "#454748",
+                    "primary-fixed": "#c9eadc",
+                    "on-primary-container": "#759487",
+                    "inverse-on-surface": "#f3f0ef",
+                    "primary-container": "#0d2b22",
+                    "error": "#ba1a1a",
+                    "on-tertiary-container": "#8a8e91",
+                    "secondary": "#5c5f60",
+                    "tertiary": "#0e1214",
+                    "on-error-container": "#93000a",
+                    "surface": "#fcf9f8",
+                    "surface-container": "#f0eded",
+                    "tertiary-fixed-dim": "#c4c7ca",
+                    "on-secondary": "#ffffff",
+                    "background": "#fcf9f8",
+                    "secondary-fixed-dim": "#c5c7c8",
+                    "surface-dim": "#dcd9d9",
+                    "on-primary-fixed-variant": "#2f4c42",
+                    "on-tertiary-fixed-variant": "#43474a",
+                    "surface-variant": "#e5e2e1",
+                    "surface-container-high": "#eae7e7",
+                    "surface-tint": "#476459",
+                    "on-surface": "#1c1b1b",
+                    "tertiary-container": "#232729",
+                    "surface-container-highest": "#e5e2e1",
+                    "outline-variant": "#c1c8c3",
+                    "surface-container-low": "#f6f3f2",
+                    "inverse-surface": "#313030",
+                    "tertiary-fixed": "#e0e3e6",
+                    "primary": "#00150e",
+                    "on-tertiary": "#ffffff",
+                    "outline": "#727975",
+                    "surface-container-lowest": "#ffffff",
+                    "error-container": "#ffdad6",
+                    "on-secondary-fixed": "#191c1d",
+                    "on-background": "#1c1b1b"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "margin-mobile": "16px",
+                    "xs": "0.5rem",
+                    "margin-desktop": "48px",
+                    "lg": "2.5rem",
+                    "sm": "1rem",
+                    "md": "1.5rem",
+                    "xl": "4rem",
+                    "gutter": "24px",
+                    "base": "4px"
+            },
+            "fontFamily": {
+                    "headline-md": ["Literata"],
+                    "label-sm": ["Geist"],
+                    "body-md": ["Geist"],
+                    "body-lg": ["Geist"],
+                    "display-lg-mobile": ["Literata"],
+                    "display-lg": ["Literata"],
+                    "interface-md": ["Geist"]
+            },
+            "fontSize": {
+                    "headline-md": ["24px", {"lineHeight": "1.4", "fontWeight": "500"}],
+                    "label-sm": ["12px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "display-lg-mobile": ["32px", {"lineHeight": "1.25", "fontWeight": "600"}],
+                    "display-lg": ["48px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                    "interface-md": ["14px", {"lineHeight": "1.2", "fontWeight": "500"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .writing-canvas {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .editor-container blockquote {
+            border-left: 4px solid #adcec0;
+            padding-left: 1.5rem;
+            font-style: italic;
+            color: #414845;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #e5e2e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #c1c8c3; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body-md overflow-x-hidden">
+<!-- TopAppBar -->
+<header class="sticky top-0 z-50 flex justify-between items-center w-full px-margin-desktop py-4 bg-surface dark:bg-tertiary">
+<div class="flex items-center gap-8">
+<span class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed">LexisFlow</span>
+<nav class="hidden md:flex gap-6">
+<a class="text-secondary dark:text-secondary-fixed-dim font-body-md hover:text-primary-fixed-variant transition-colors" href="#">Dashboard</a>
+<a class="text-primary dark:text-primary-fixed font-bold border-b-2 border-primary font-body-md" href="#">Articles</a>
+<a class="text-secondary dark:text-secondary-fixed-dim font-body-md hover:text-primary-fixed-variant transition-colors" href="#">Projects</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 px-3 py-1 bg-surface-container-low rounded-full">
+<span class="material-symbols-outlined text-[18px] text-on-surface-variant">search</span>
+<input class="bg-transparent border-none focus:ring-0 font-body-md text-body-md w-32 md:w-64" placeholder="Search..." type="text"/>
+</div>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors" data-icon="notifications">notifications</button>
+<div class="h-8 w-8 rounded-full overflow-hidden border border-outline-variant">
+<img alt="User avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCWDL4INLP8oDykyzntLbvYLXq2bnbiRF96uSL5RywUQfNmAw1A17k4NpLZGvkBg4rT-9HDl8NrWeIfyHRyjZxtydRlFGz_tu-Eb9z7Ub9f-3H-P26vYzOIGsG6sykwApm4rCzFB0K4a48S95ccawT2B7AwylK9luuthZ_U7GAcF6NdS5FDtp-zMJwyrofzX0evBxUjMcW8KCZcsdGVUPc2SicTIm_O4UWX-AtnY9RKsA10dgCiZzQpmKNJzSLRjrCcdfNLtwSBOtY"/>
+</div>
+</div>
+</header>
+<div class="flex min-h-[calc(100vh-72px)]">
+<!-- SideNavBar -->
+<aside class="hidden md:flex fixed left-0 top-[72px] h-full w-[280px] flex-col py-md border-r border-outline-variant bg-surface-container-low">
+<div class="px-6 mb-8">
+<h2 class="font-label-sm text-label-sm text-secondary tracking-widest uppercase mb-4">Editing Suite</h2>
+<div class="flex flex-col gap-1">
+<a class="flex items-center gap-3 text-secondary pl-4 py-2 hover:bg-surface-container transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-interface-md text-interface-md">Overview</span>
+</a>
+<a class="flex items-center gap-3 text-primary font-bold border-l-2 border-primary pl-4 py-2 bg-surface-container-high transition-transform active:scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="description">description</span>
+<span class="font-interface-md text-interface-md">Current Draft</span>
+</a>
+<a class="flex items-center gap-3 text-secondary pl-4 py-2 hover:bg-surface-container transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="history">history</span>
+<span class="font-interface-md text-interface-md">Version History</span>
+</a>
+<a class="flex items-center gap-3 text-secondary pl-4 py-2 hover:bg-surface-container transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="chat">chat</span>
+<span class="font-interface-md text-interface-md">Comments</span>
+</a>
+</div>
+</div>
+<div class="mt-auto px-6 pb-24">
+<button class="w-full py-3 bg-primary text-on-primary rounded-lg flex items-center justify-center gap-2 hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined text-[20px]" data-icon="send">send</span>
+<span class="font-label-sm text-label-sm">Submit Article</span>
+</button>
+</div>
+</aside>
+<!-- Main Content (Canvas) -->
+<main class="flex-1 md:ml-[280px] md:mr-[320px] bg-surface min-h-full">
+<!-- Header/Status Area -->
+<div class="writing-canvas pt-12 px-6">
+<div class="mb-12 flex flex-col gap-6">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="px-3 py-1 bg-error-container text-on-error-container rounded-full font-label-sm text-label-sm">Needs Rework</span>
+<span class="text-secondary font-label-sm text-label-sm">Last saved: 14 mins ago</span>
+</div>
+<div class="flex gap-2">
+<button class="px-4 py-2 border border-outline-variant text-secondary rounded hover:bg-surface-container transition-colors font-label-sm text-label-sm">Preview</button>
+<button class="px-4 py-2 border border-outline-variant text-secondary rounded hover:bg-surface-container transition-colors font-label-sm text-label-sm">Save Draft</button>
+</div>
+</div>
+<!-- Manager Feedback Card -->
+<div class="bg-surface-container-low border border-error-container/30 rounded-xl p-6 flex gap-4 items-start shadow-sm">
+<span class="material-symbols-outlined text-error" data-icon="error_outline">error_outline</span>
+<div>
+<h3 class="font-interface-md text-interface-md text-error font-bold mb-1">Editorial Feedback</h3>
+<p class="text-on-surface-variant font-body-md leading-relaxed">
+                                "The second section feels a bit light on technical details. Please expand on the API integration process and include a specific code snippet or architectural diagram reference. Tone remains excellent, just needs more substance in the middle."
+                                <br/>
+<span class="font-bold text-secondary text-sm mt-2 block">— Marcus V., Senior Editor</span>
+</p>
+</div>
+</div>
+</div>
+<!-- Editor Title -->
+<input class="w-full border-none focus:ring-0 font-headline-md text-display-lg-mobile md:text-display-lg text-primary placeholder:opacity-30 bg-transparent mb-8" placeholder="Article Title..." type="text" value="The Evolution of Headless Content Systems"/>
+<!-- Writing Area -->
+<div class="editor-container">
+<div class="flex gap-4 border-b border-outline-variant pb-4 mb-8">
+<button class="material-symbols-outlined text-secondary hover:text-primary transition-colors" data-icon="format_bold">format_bold</button>
+<button class="material-symbols-outlined text-secondary hover:text-primary transition-colors" data-icon="format_italic">format_italic</button>
+<button class="material-symbols-outlined text-secondary hover:text-primary transition-colors" data-icon="format_h1">format_h1</button>
+<button class="material-symbols-outlined text-secondary hover:text-primary transition-colors" data-icon="format_h2">format_h2</button>
+<button class="material-symbols-outlined text-secondary hover:text-primary transition-colors" data-icon="format_quote">format_quote</button>
+<button class="material-symbols-outlined text-secondary hover:text-primary transition-colors" data-icon="link">link</button>
+<button class="material-symbols-outlined text-secondary hover:text-primary transition-colors" data-icon="image">image</button>
+<div class="h-6 w-[1px] bg-outline-variant mx-2"></div>
+<button class="material-symbols-outlined text-secondary hover:text-primary transition-colors" data-icon="undo">undo</button>
+<button class="material-symbols-outlined text-secondary hover:text-primary transition-colors" data-icon="redo">redo</button>
+</div>
+<div class="outline-none font-body-lg text-body-lg leading-relaxed text-on-surface min-h-[500px] prose" contenteditable="true">
+<p class="mb-6">In the rapidly shifting landscape of digital publishing, the "headless" approach has transitioned from a niche developer trend to the industry standard for enterprise-level content strategies. By decoupling the content repository from the presentation layer, organizations gain unprecedented flexibility.</p>
+<h2 class="font-headline-md text-headline-md text-primary mt-12 mb-4">The Agnostic Nature of Content</h2>
+<p class="mb-6">Pure content is data. When we strip away the CSS and the HTML templates, what remains is the core message—the structured information that can be consumed by a web browser, a mobile app, or a voice assistant with equal ease.</p>
+<blockquote class="mb-6">"True content strategy isn't about where the words live today, but where they might travel tomorrow."</blockquote>
+<p class="mb-6">However, this flexibility comes with a trade-off. Editors often feel disconnected from the final visual output, losing the "What You See Is What You Get" (WYSIWYG) comfort of legacy platforms like WordPress.</p>
+<p class="mb-6 text-on-surface-variant italic">Enter the context for Marcus's feedback: I need to add more technical depth here regarding the GraphQL schema and how it handles nested content blocks...</p>
+</div>
+</div>
+</div>
+</main>
+<!-- Right Utility Sidebar (Contextual) -->
+<aside class="hidden lg:block fixed right-0 top-[72px] h-full w-[320px] bg-surface-container-low border-l border-outline-variant p-6">
+<div class="flex flex-col h-full">
+<!-- SEO & Metadata -->
+<div class="mb-8">
+<h3 class="font-label-sm text-label-sm text-secondary tracking-widest uppercase mb-6 flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px]" data-icon="search">search</span> SEO Configuration
+                    </h3>
+<div class="space-y-6">
+<div>
+<label class="block font-label-sm text-label-sm text-secondary uppercase mb-2">Focus Keyword</label>
+<input class="w-full bg-surface border border-outline-variant rounded p-3 font-interface-md text-interface-md focus:border-primary focus:ring-0 outline-none" type="text" value="Headless CMS Evolution"/>
+</div>
+<div>
+<label class="block font-label-sm text-label-sm text-secondary uppercase mb-2">Meta Description</label>
+<textarea class="w-full bg-surface border border-outline-variant rounded p-3 font-interface-md text-interface-md focus:border-primary focus:ring-0 outline-none resize-none" rows="4">Explore how decoupled content architectures are redefining the modern editorial workflow and enabling omnichannel publishing at scale.</textarea>
+<div class="flex justify-between mt-1">
+<span class="text-[10px] text-secondary">134 / 160 characters</span>
+<span class="text-[10px] text-primary-fixed-dim font-bold">Optimal</span>
+</div>
+</div>
+<div>
+<label class="block font-label-sm text-label-sm text-secondary uppercase mb-2">Tags</label>
+<div class="flex flex-wrap gap-2 mb-2">
+<span class="px-2 py-1 bg-secondary-container text-on-secondary-container rounded font-label-sm text-label-sm flex items-center gap-1">
+                                    Technology <button class="material-symbols-outlined text-[14px]">close</button>
+</span>
+<span class="px-2 py-1 bg-secondary-container text-on-secondary-container rounded font-label-sm text-label-sm flex items-center gap-1">
+                                    CMS <button class="material-symbols-outlined text-[14px]">close</button>
+</span>
+</div>
+<input class="w-full bg-surface border border-outline-variant border-dashed rounded p-2 font-interface-md text-interface-md outline-none" placeholder="Add tag..." type="text"/>
+</div>
+</div>
+</div>
+<!-- AI Insights -->
+<div class="bg-primary-container rounded-xl p-5 mb-8">
+<div class="flex items-center gap-2 mb-3">
+<span class="material-symbols-outlined text-primary-fixed" data-icon="auto_awesome">auto_awesome</span>
+<h4 class="font-label-sm text-label-sm text-primary-fixed uppercase">AI Assistant</h4>
+</div>
+<p class="text-on-primary-fixed-variant text-sm mb-4">Readability score is <strong>High (78)</strong>. Sentence variety is good, but consider shortening paragraphs in the first section for better mobile legibility.</p>
+<button class="w-full py-2 bg-primary-fixed text-on-primary-fixed rounded font-label-sm text-label-sm hover:opacity-90">Generate Meta Title</button>
+</div>
+<!-- Featured Image -->
+<div>
+<h3 class="font-label-sm text-label-sm text-secondary tracking-widest uppercase mb-4">Featured Image</h3>
+<div class="aspect-video w-full rounded-lg bg-surface border border-outline-variant overflow-hidden group relative cursor-pointer">
+<img class="w-full h-full object-cover" data-alt="A sophisticated, high-end 3D render of abstract glass nodes interconnected by glowing filaments. The aesthetic is clean, minimalist, and modern, using a palette of soft whites, deep forest greens, and metallic silver. Soft cinematic lighting highlights the smooth surfaces of the nodes, reflecting a professional and high-tech digital workspace vibe." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDb0zx0km9GGuC0DE6jeymYqiUpsXXSbrGnfU4wOE3eM3seFFCaarmv4EeodJeQQmgw7iVVs4RZMhqhHQzAqNAqDK6KeU8zdd3jk1dtGxskYay-E3Un6zfJolDAGRDBiNaD08w_lvXZOvwljIeQ2xQxzRMCai7BqjSPGb4g206kcuWvYyvPNzPSxFErz86EYlacl9LMyQp5QLHCpQS9UNYVURalwoZlwkpDhR6pWG8omZJwB3gJDGD0WDevz_ZaS_QgT4To0bbPw0Q"/>
+<div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+<span class="material-symbols-outlined text-white" data-icon="upload">upload</span>
+</div>
+</div>
+</div>
+</div>
+</aside>
+</div>
+<!-- Mobile Navigation (Hidden on Desktop) -->
+<nav class="md:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-outline-variant flex justify-around py-3 px-4 z-50">
+<button class="flex flex-col items-center gap-1 text-secondary">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-label-sm text-label-sm">Home</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-primary">
+<span class="material-symbols-outlined" data-icon="edit_note" style="font-variation-settings: 'FILL' 1;">edit_note</span>
+<span class="font-label-sm text-label-sm">Edit</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-secondary">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-label-sm text-label-sm">Settings</span>
+</button>
+</nav>
+<script>
+        // Micro-interactions for the editor
+        const editor = document.querySelector('[contenteditable="true"]');
+        
+        // Auto-save simulation
+        let saveTimeout;
+        editor.addEventListener('input', () => {
+            clearTimeout(saveTimeout);
+            document.querySelector('.text-secondary.font-label-sm').textContent = 'Saving...';
+            saveTimeout = setTimeout(() => {
+                document.querySelector('.text-secondary.font-label-sm').textContent = 'Last saved: Just now';
+            }, 2000);
+        });
+
+        // Simple Fade-in effect
+        document.addEventListener('DOMContentLoaded', () => {
+            document.body.style.opacity = '0';
+            document.body.style.transition = 'opacity 0.6s ease-in-out';
+            setTimeout(() => {
+                document.body.style.opacity = '1';
+            }, 100);
+        });
+    </script>
+</body></html>

@@ -1,0 +1,41 @@
+0 verbose cli C:\Program Files\nodejs\node.exe C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js
+1 info using npm@10.9.3
+2 info using node@v22.19.0
+3 silly config load:file:C:\Program Files\nodejs\node_modules\npm\npmrc
+4 silly config load:file:C:\Users\Dell\Documents\Writing\backend\.npmrc
+5 silly config load:file:C:\Users\Dell\.npmrc
+6 silly config load:file:C:\Users\Dell\Documents\Writing\backend\etc\npmrc
+7 verbose title npm install
+8 verbose argv "install" "--prefix" "backend"
+9 verbose logfile logs-max:10 dir:C:\Users\Dell\Documents\Writing\.npm-cache\_logs\2026-05-26T11_23_44_007Z-
+10 verbose logfile C:\Users\Dell\Documents\Writing\.npm-cache\_logs\2026-05-26T11_23_44_007Z-debug-0.log
+11 silly logfile done cleaning log files
+12 silly packumentCache heap:4345298944 maxSize:1086324736 maxEntrySize:543162368
+13 verbose stack Error: Could not read package.json: Error: ENOENT: no such file or directory, open 'C:\Users\Dell\Documents\Writing\package.json'
+13 verbose stack     at async open (node:internal/fs/promises:641:25)
+13 verbose stack     at async readFile (node:internal/fs/promises:1245:14)
+13 verbose stack     at async read (C:\Program Files\nodejs\node_modules\npm\node_modules\@npmcli\package-json\lib\read-package.js:9:18)
+13 verbose stack     at async PackageJson.load (C:\Program Files\nodejs\node_modules\npm\node_modules\@npmcli\package-json\lib\index.js:132:31)
+13 verbose stack     at async PackageJson.normalize (C:\Program Files\nodejs\node_modules\npm\node_modules\@npmcli\package-json\lib\index.js:118:5)
+13 verbose stack     at async C:\Program Files\nodejs\node_modules\npm\node_modules\@npmcli\arborist\lib\arborist\build-ideal-tree.js:515:22
+13 verbose stack     at async Promise.all (index 0)
+13 verbose stack     at async #add (C:\Program Files\nodejs\node_modules\npm\node_modules\@npmcli\arborist\lib\arborist\build-ideal-tree.js:504:5)
+13 verbose stack     at async #applyUserRequestsToNode (C:\Program Files\nodejs\node_modules\npm\node_modules\@npmcli\arborist\lib\arborist\build-ideal-tree.js:473:7)
+13 verbose stack     at async #applyUserRequests (C:\Program Files\nodejs\node_modules\npm\node_modules\@npmcli\arborist\lib\arborist\build-ideal-tree.js:408:7)
+14 error code ENOENT
+15 error syscall open
+16 error path C:\Users\Dell\Documents\Writing\package.json
+17 error errno -4058
+18 error enoent Could not read package.json: Error: ENOENT: no such file or directory, open 'C:\Users\Dell\Documents\Writing\package.json'
+19 error enoent This is related to npm not being able to find a file.
+19 error enoent
+20 silly unfinished npm timer reify 1779794624460
+21 silly unfinished npm timer reify:loadTrees 1779794624461
+22 silly unfinished npm timer idealTree:userRequests 1779794624471
+23 verbose cwd C:\Users\Dell\Documents\Writing
+24 verbose os Windows_NT 10.0.26200
+25 verbose node v22.19.0
+26 verbose npm  v10.9.3
+27 verbose exit -4058
+28 verbose code -4058
+29 error A complete log of this run can be found in: C:\Users\Dell\Documents\Writing\.npm-cache\_logs\2026-05-26T11_23_44_007Z-debug-0.log

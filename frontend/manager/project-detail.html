@@ -1,0 +1,331 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Real Write • Manager • Project</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+    <script src="/shared/config.js"></script>
+    <script src="/shared/app.js"></script>
+    <script src="/shared/topbar.js"></script>
+  </head>
+  <body>
+    <div class="topbar" id="topbar"></div>
+    <div class="wrap">
+      <div class="grid">
+        <div class="card" style="grid-column: span 5">
+          <h2>Project Settings</h2>
+          <div>
+            <label class="muted">Title</label>
+            <input id="pTitle" />
+          </div>
+          <div style="margin-top: 10px">
+            <label class="muted">Description</label>
+            <textarea id="pDesc"></textarea>
+          </div>
+          <div class="two" style="margin-top: 10px">
+            <label class="pill"><input type="checkbox" id="pAi" /> AI check enabled</label>
+            <label class="pill"><input type="checkbox" id="pPlag" /> Plagiarism check enabled</label>
+          </div>
+          <div class="right" style="margin-top: 12px">
+            <button class="secondary" id="saveProject">Save</button>
+          </div>
+
+          <div style="margin-top: 18px; border-top: 1px solid rgba(229,226,225,0.9); padding-top: 14px">
+            <h2 style="margin-bottom: 8px">Writers</h2>
+            <div class="muted">Search writers by name or email, then assign with a price.</div>
+            <div style="margin-top: 10px">
+              <label class="muted">Search</label>
+              <input id="writerSearch" placeholder="type a name or email..." />
+            </div>
+            <div class="muted" style="margin-top: 8px; display:flex; align-items:center; gap:8px;">
+              <span id="writerMiniLoad" class="hidden" style="display:inline-flex;align-items:center;gap:8px;">
+                <span class="rw-spinner" style="width:14px;height:14px;border-width:2px"></span>
+                <span>Searching...</span>
+              </span>
+            </div>
+            <div
+              style="margin-top: 10px; max-height: 320px; overflow: auto; border: 1px solid rgba(229,226,225,0.95); border-radius: 16px; background: rgba(255,255,255,.65)"
+            >
+              <table style="margin: 0">
+                <thead><tr><th>Writer</th><th></th></tr></thead>
+                <tbody id="writerRows"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="muted" id="msg" style="margin-top: 10px"></div>
+        </div>
+
+        <div class="card" style="grid-column: span 7">
+          <h2>Assigned Writers</h2>
+          <table>
+            <thead><tr><th>Writer</th><th>Price</th><th>Assigned</th><th></th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <dialog id="priceDlg" style="border:0;border-radius:18px;box-shadow:0 26px 70px rgba(0,0,0,.18);padding:0;max-width:min(520px,calc(100vw - 32px));">
+      <form method="dialog" style="margin:0;padding:16px 16px;background:rgba(255,255,255,.92);border:1px solid rgba(229,226,225,0.9);border-radius:18px;backdrop-filter: blur(12px);">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+          <div>
+            <div style="font-weight:800;font-size:14px;color:var(--rw-text);" id="dlgTitle">Set price</div>
+            <div class="muted" style="margin-top:4px;" id="dlgSub"></div>
+          </div>
+          <button class="secondary" value="cancel" type="submit" aria-label="Close" style="padding:8px 10px;border-radius:12px;">&times;</button>
+        </div>
+        <div style="margin-top:12px">
+          <label class="muted">Price per article</label>
+          <input id="dlgPrice" type="number" min="0" step="0.01" value="0" />
+        </div>
+        <div class="right" style="margin-top:14px">
+          <button class="secondary" value="cancel" type="submit">Cancel</button>
+          <button id="dlgOk" value="ok" type="submit">Save</button>
+        </div>
+        <div class="muted" id="dlgMsg" style="margin-top:10px"></div>
+      </form>
+    </dialog>
+
+    <script>
+      (async function () {
+        const user = await APP.requireRole("manager");
+        if (!user) return;
+        await renderTopbar({
+          role: user.role,
+          links: [
+            { href: "/manager/dashboard.html", label: "Dashboard" },
+            { href: "/manager/projects.html", label: "Projects" }
+          ]
+        });
+
+        const params = new URLSearchParams(window.location.search);
+        const id = params.get("id");
+        if (!id) {
+          window.location.href = "/manager/dashboard.html";
+          return;
+        }
+
+        const msg = (t) => (document.getElementById("msg").textContent = t || "");
+
+        async function loadProject() {
+          const projects = await APP.apiFetch("/api/projects");
+          const project = (projects.projects || []).find((p) => p.id === id);
+          if (!project) throw new Error("Project not found.");
+          document.getElementById("pTitle").value = project.title || "";
+          document.getElementById("pDesc").value = project.description || "";
+          document.getElementById("pAi").checked = !!project.ai_check_enabled;
+          document.getElementById("pPlag").checked = !!project.plagiarism_check_enabled;
+        }
+
+        async function refreshAssigned() {
+          APP.ui.tableSkeleton("rows", { rows: 6, cols: 3 });
+          const writers = await APP.apiFetch(`/api/projects/${encodeURIComponent(id)}/writers`);
+          const assigned = writers.writers || [];
+          window.__assignedWriters = new Map(assigned.map((w) => [w.writer_id, w]));
+          document.getElementById("rows").innerHTML = assigned
+            .map(
+              (w) => `<tr>
+              <td>${APP.escapeHtml(w.users?.full_name || "Writer")}<div class="muted">${APP.escapeHtml(w.users?.email || "")}</div></td>
+              <td>&#8377;${APP.escapeHtml(w.price_per_article)}</td>
+              <td class="muted">${APP.escapeHtml(new Date(w.assigned_at).toLocaleString())}</td>
+              <td class="right">
+                <button class="secondary" data-edit="${w.writer_id}">Edit</button>
+                <button class="danger" data-remove="${w.writer_id}" style="margin-left:8px">Remove</button>
+              </td>
+            </tr>`
+            )
+            .join("");
+
+          for (const b of document.querySelectorAll("button[data-edit]")) {
+            b.onclick = async () => {
+              const writerId = b.getAttribute("data-edit");
+              const row = window.__assignedWriters.get(writerId);
+              await openPriceDialog({
+                title: "Edit writer price",
+                sub: `${row?.users?.full_name || "Writer"} • ${row?.users?.email || ""}`,
+                price: Number(row?.price_per_article || 0),
+                onSave: async (price) => {
+                  await APP.apiFetch(`/api/projects/${encodeURIComponent(id)}/writers/${encodeURIComponent(writerId)}`, {
+                    method: "PATCH",
+                    body: JSON.stringify({ price_per_article: price })
+                  });
+                }
+              });
+              await refreshAssigned();
+              renderWriterRows();
+            };
+          }
+
+          for (const b of document.querySelectorAll("button[data-remove]")) {
+            b.onclick = async () => {
+              const writerId = b.getAttribute("data-remove");
+              const row = window.__assignedWriters.get(writerId);
+              const ok = confirm(`Remove ${row?.users?.full_name || "writer"} from this project?`);
+              if (!ok) return;
+              msg("");
+              try {
+                await APP.apiFetch(`/api/projects/${encodeURIComponent(id)}/writers/${encodeURIComponent(writerId)}`, {
+                  method: "DELETE"
+                });
+                await refreshAssigned();
+                renderWriterRows();
+                msg("Removed.");
+              } catch (e) {
+                msg(e.message || String(e));
+              }
+            };
+          }
+        }
+
+        let allWriters = [];
+        async function loadWriters(q) {
+          const mini = document.getElementById("writerMiniLoad");
+          if (mini) mini.classList.remove("hidden");
+          const resp = await APP.apiFetch(`/api/users/writers${q ? `?q=${encodeURIComponent(q)}` : ""}`, { skipLoader: true });
+          allWriters = resp.users || [];
+          renderWriterRows();
+          if (mini) mini.classList.add("hidden");
+        }
+
+        function renderWriterRows() {
+          const filtered = allWriters;
+          const assignedMap = window.__assignedWriters || new Map();
+
+          document.getElementById("writerRows").innerHTML = filtered
+            .map(
+              (u) => `<tr>
+              <td>${APP.escapeHtml(u.full_name || "")}<div class="muted">${APP.escapeHtml(u.email || "")}</div></td>
+              <td class="right">
+                ${
+                  assignedMap.has(u.id)
+                    ? "<span class='pill' style='padding:6px 10px; font-weight:750;'>Already added</span>"
+                    : `<button class="secondary" data-assign="${u.id}">Assign</button>`
+                }
+              </td>
+            </tr>`
+            )
+            .join("");
+
+          for (const b of document.querySelectorAll("button[data-assign]")) {
+            b.onclick = async () => {
+              msg("");
+              try {
+                const writerId = b.getAttribute("data-assign");
+                const u = allWriters.find((x) => x.id === writerId);
+                await openPriceDialog({
+                  title: "Assign writer",
+                  sub: `${u?.full_name || "Writer"} • ${u?.email || ""}`,
+                  price: 0,
+                  onSave: async (price) => {
+                    await APP.apiFetch(`/api/projects/${encodeURIComponent(id)}/writers`, {
+                      method: "POST",
+                      body: JSON.stringify({ writer_id: writerId, price_per_article: price })
+                    });
+                  }
+                });
+                await refreshAssigned();
+                renderWriterRows();
+                msg("Assigned.");
+              } catch (e) {
+                msg(e.message || String(e));
+              }
+            };
+          }
+        }
+
+        async function openPriceDialog({ title, sub, price, onSave }) {
+          const dlg = document.getElementById("priceDlg");
+          const t = document.getElementById("dlgTitle");
+          const s = document.getElementById("dlgSub");
+          const p = document.getElementById("dlgPrice");
+          const m = document.getElementById("dlgMsg");
+          const okBtn = document.getElementById("dlgOk");
+
+          t.textContent = title || "Set price";
+          s.textContent = sub || "";
+          p.value = String(Number.isFinite(Number(price)) ? Number(price) : 0);
+          m.textContent = "";
+
+          return new Promise((resolve, reject) => {
+            const onClose = async () => {
+              dlg.removeEventListener("close", onClose);
+              okBtn.onclick = null;
+              if (dlg.returnValue !== "ok") return resolve(false);
+
+              const v = Number(p.value);
+              if (!Number.isFinite(v) || v < 0) {
+                m.textContent = "Please enter a valid non-negative price.";
+                dlg.showModal();
+                dlg.addEventListener("close", onClose);
+                return;
+              }
+
+              try {
+                okBtn.disabled = true;
+                await onSave(v);
+                resolve(true);
+              } catch (e) {
+                reject(e);
+              } finally {
+                okBtn.disabled = false;
+              }
+            };
+            dlg.addEventListener("close", onClose);
+            dlg.showModal();
+          });
+        }
+
+        let searchTimer = null;
+        document.getElementById("writerSearch").addEventListener("input", () => {
+          const q = String(document.getElementById("writerSearch").value || "").trim();
+          if (searchTimer) clearTimeout(searchTimer);
+          searchTimer = setTimeout(async () => {
+            try {
+              await loadWriters(q);
+            } catch (e) {
+              const m = String(e?.message || e || "");
+              if (m.includes("(404)")) {
+                msg("Writers API not found (404). Restart the backend server so it loads the latest routes.");
+              } else {
+                msg(m);
+              }
+              const mini = document.getElementById("writerMiniLoad");
+              if (mini) mini.classList.add("hidden");
+            }
+          }, 220);
+        });
+
+        document.getElementById("saveProject").onclick = async () => {
+          msg("");
+          try {
+            const body = {
+              title: document.getElementById("pTitle").value.trim(),
+              description: document.getElementById("pDesc").value,
+              ai_check_enabled: document.getElementById("pAi").checked,
+              plagiarism_check_enabled: document.getElementById("pPlag").checked
+            };
+            await APP.apiFetch(`/api/projects/${encodeURIComponent(id)}`, {
+              method: "PATCH",
+              body: JSON.stringify(body)
+            });
+            await loadProject();
+            msg("Saved.");
+          } catch (e) {
+            msg(e.message || String(e));
+          }
+        };
+
+        try {
+          msg("");
+          await loadProject();
+          await refreshAssigned();
+          await loadWriters("");
+        } catch (e) {
+          msg(e.message || String(e));
+        }
+      })();
+    </script>
+  </body>
+</html>

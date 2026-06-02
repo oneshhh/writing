@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Real Write | Sign In</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,200..900;1,7..72,200..900&family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              surface: "#fcf9f8",
+              outline: "#727975",
+              "on-surface-variant": "#414845",
+              "on-primary-fixed": "#022018",
+              "tertiary-fixed-dim": "#c4c7ca",
+              "secondary-fixed": "#e1e3e4",
+              "error-container": "#ffdad6",
+              "on-secondary": "#ffffff",
+              "on-error-container": "#93000a",
+              "tertiary-fixed": "#e0e3e6",
+              "on-primary": "#ffffff",
+              "primary-fixed-dim": "#adcec0",
+              "on-secondary-fixed-variant": "#454748",
+              "on-tertiary-fixed": "#181c1e",
+              tertiary: "#0e1214",
+              "surface-container-highest": "#e5e2e1",
+              "inverse-on-surface": "#f3f0ef",
+              "primary-fixed": "#c9eadc",
+              "surface-container-high": "#eae7e7",
+              "outline-variant": "#c1c8c3",
+              "surface-dim": "#dcd9d9",
+              "on-tertiary-fixed-variant": "#43474a",
+              "on-secondary-fixed": "#191c1d",
+              error: "#ba1a1a",
+              "inverse-primary": "#adcec0",
+              "on-tertiary": "#ffffff",
+              background: "#fcf9f8",
+              "tertiary-container": "#232729",
+              "surface-container": "#f0eded",
+              "surface-bright": "#fcf9f8",
+              "on-error": "#ffffff",
+              "surface-container-lowest": "#ffffff",
+              "on-background": "#1c1b1b",
+              "surface-tint": "#476459",
+              "surface-container-low": "#f6f3f2",
+              "secondary-fixed-dim": "#c5c7c8",
+              "on-primary-fixed-variant": "#2f4c42",
+              "primary-container": "#0d2b22",
+              "inverse-surface": "#313030",
+              "secondary-container": "#e1e3e4",
+              "on-surface": "#1c1b1b",
+              "surface-variant": "#e5e2e1",
+              primary: "#00150e",
+              "on-tertiary-container": "#8a8e91",
+              secondary: "#5c5f60",
+              "on-secondary-container": "#626566",
+              "on-primary-container": "#759487"
+            },
+            borderRadius: {
+              DEFAULT: "0.125rem",
+              lg: "0.25rem",
+              xl: "0.5rem",
+              full: "0.75rem"
+            },
+            spacing: {
+              xl: "4rem",
+              md: "1.5rem",
+              "margin-mobile": "16px",
+              lg: "2.5rem",
+              base: "4px",
+              sm: "1rem",
+              "margin-desktop": "48px",
+              xs: "0.5rem",
+              gutter: "24px"
+            },
+            fontFamily: {
+              "headline-md": ["Literata"],
+              "display-lg": ["Literata"],
+              "body-md": ["Inter"],
+              "body-lg": ["Inter"],
+              "display-lg-mobile": ["Literata"],
+              "label-sm": ["Inter"],
+              "interface-md": ["Inter"]
+            },
+            fontSize: {
+              "headline-md": ["24px", { lineHeight: "1.4", fontWeight: "500" }],
+              "display-lg": ["48px", { lineHeight: "1.2", letterSpacing: "-0.02em", fontWeight: "600" }],
+              "body-md": ["16px", { lineHeight: "1.5", fontWeight: "400" }],
+              "body-lg": ["18px", { lineHeight: "1.6", fontWeight: "400" }],
+              "display-lg-mobile": ["32px", { lineHeight: "1.25", fontWeight: "600" }],
+              "label-sm": ["12px", { lineHeight: "1", letterSpacing: "0.05em", fontWeight: "600" }],
+              "interface-md": ["14px", { lineHeight: "1.2", fontWeight: "500" }]
+            }
+          }
+        }
+      };
+    </script>
+    <style>
+      body {
+        background-color: #fcf9f8;
+        -webkit-font-smoothing: antialiased;
+      }
+      .material-symbols-outlined {
+        font-variation-settings:
+          "FILL" 0,
+          "wght" 300,
+          "GRAD" 0,
+          "opsz" 24;
+        vertical-align: middle;
+      }
+      .transition-soft {
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+    </style>
+  </head>
+  <body class="min-h-screen flex flex-col md:flex-row">
+    <section
+      class="hidden md:flex md:w-1/2 lg:w-3/5 bg-surface-container-low relative items-center justify-center p-margin-desktop overflow-hidden border-r border-outline-variant"
+    >
+      <div
+        class="absolute inset-0 opacity-[0.03]"
+        style="background-image: radial-gradient(circle at 2px 2px, #476459 1px, transparent 0); background-size: 40px 40px"
+      ></div>
+      <div class="relative z-10 max-w-xl text-center space-y-lg">
+        <div class="mb-xl flex justify-center">
+          <a
+            class="inline-flex items-center justify-center"
+            href="https://www.linkedin.com/company/realwrite"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Real Write on LinkedIn"
+          >
+            <img
+              alt="Real Write"
+              class="h-24 w-auto object-contain"
+              src="/assets/realwrite-logo.png"
+            />
+          </a>
+        </div>
+        <div class="space-y-sm">
+          <h2 class="font-display-lg text-display-lg text-primary italic leading-tight">Real Write</h2>
+          <p class="font-body-lg text-body-lg text-on-surface-variant max-w-md mx-auto italic opacity-80">
+            "Your dedicated space for editorial excellence, where every word finds its rhythm."
+          </p>
+        </div>
+        <div class="pt-xl flex justify-center space-x-md">
+          <div class="flex flex-col items-center gap-xs">
+            <span class="material-symbols-outlined text-primary text-[32px]">edit_note</span>
+            <span class="font-label-sm text-label-sm uppercase tracking-widest text-outline">Focus</span>
+          </div>
+          <div class="w-px h-12 bg-outline-variant opacity-50"></div>
+          <div class="flex flex-col items-center gap-xs">
+            <span class="material-symbols-outlined text-primary text-[32px]">auto_fix_high</span>
+            <span class="font-label-sm text-label-sm uppercase tracking-widest text-outline">Refine</span>
+          </div>
+          <div class="w-px h-12 bg-outline-variant opacity-50"></div>
+          <div class="flex flex-col items-center gap-xs">
+            <span class="material-symbols-outlined text-primary text-[32px]">history_edu</span>
+            <span class="font-label-sm text-label-sm uppercase tracking-widest text-outline">Create</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="md:hidden w-full p-margin-mobile flex justify-between items-center bg-surface-container-low border-b border-outline-variant">
+      <a href="https://www.linkedin.com/company/realwrite" target="_blank" rel="noopener noreferrer" aria-label="Real Write on LinkedIn">
+        <div class="flex items-center gap-3">
+        <img
+          alt="Real Write"
+          class="h-12 w-auto object-contain"
+          src="/assets/realwrite-logo.png"
+        />
+        <span class="font-display-lg-mobile text-display-lg-mobile text-primary italic">Real Write</span>
+        </div>
+      </a>
+      <a
+        class="inline-flex items-center gap-xs font-label-sm text-label-sm uppercase tracking-widest text-outline hover:text-primary transition-soft"
+        href="https://www.linkedin.com/company/realwrite"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <span class="material-symbols-outlined text-[18px]">link</span>
+        LinkedIn
+      </a>
+    </div>
+
+    <main class="w-full md:w-1/2 lg:w-2/5 flex flex-col items-center justify-center px-margin-mobile py-xl md:px-xl bg-surface">
+      <div class="w-full max-w-md space-y-lg">
+        <header class="text-center md:text-left space-y-xs">
+          <h1 class="font-headline-md text-headline-md text-primary">Welcome back.</h1>
+          <p class="font-body-md text-body-md text-on-surface-variant">Please enter your credentials to continue.</p>
+        </header>
+
+        <form class="space-y-md" id="loginForm">
+          <div class="space-y-xs">
+            <label class="font-label-sm text-label-sm uppercase text-outline" for="email">Email Address</label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-outline">
+                <span class="material-symbols-outlined text-[18px]">mail</span>
+              </span>
+              <input
+                class="w-full pl-10 pr-3 py-3 font-interface-md text-interface-md bg-transparent border border-outline-variant rounded-lg focus:ring-1 focus:ring-primary focus:border-primary transition-soft outline-none placeholder:text-outline-variant"
+                id="email"
+                name="email"
+                placeholder="you@realwrite.com"
+                type="email"
+                autocomplete="username"
+                required
+              />
+            </div>
+          </div>
+
+          <div class="space-y-xs">
+            <label class="font-label-sm text-label-sm uppercase text-outline" for="password">Password</label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-outline">
+                <span class="material-symbols-outlined text-[18px]">lock</span>
+              </span>
+              <input
+                class="w-full pl-10 pr-3 py-3 font-interface-md text-interface-md bg-transparent border border-outline-variant rounded-lg focus:ring-1 focus:ring-primary focus:border-primary transition-soft outline-none placeholder:text-outline-variant"
+                id="password"
+                name="password"
+                placeholder="••••••••"
+                type="password"
+                autocomplete="current-password"
+                required
+              />
+            </div>
+          </div>
+
+          <div
+            class="rounded-lg border border-error/30 bg-error-container text-on-error-container font-body-md text-body-md px-4 py-3 hidden"
+            id="errBox"
+            role="alert"
+            aria-live="polite"
+          ></div>
+
+          <button
+            class="w-full py-4 bg-primary text-on-primary font-interface-md text-interface-md rounded-lg hover:opacity-90 active:scale-[0.98] transition-soft flex items-center justify-center gap-xs mt-lg"
+            id="btnSubmit"
+            type="submit"
+          >
+            <span id="btnText">Sign In</span>
+            <span class="material-symbols-outlined text-[18px]" id="btnIcon">arrow_forward</span>
+          </button>
+        </form>
+
+        <footer class="pt-lg text-center">
+          <div class="pt-lg border-t border-outline-variant flex flex-wrap justify-center gap-md">
+            <a class="font-label-sm text-label-sm text-outline hover:text-primary transition-soft uppercase" href="/privacy.html">Privacy Policy</a>
+            <a class="font-label-sm text-label-sm text-outline hover:text-primary transition-soft uppercase" href="/terms.html">Terms of Service</a>
+            <a
+              class="font-label-sm text-label-sm text-outline hover:text-primary transition-soft uppercase inline-flex items-center gap-xs"
+              href="https://www.linkedin.com/company/realwrite"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <span class="material-symbols-outlined text-[16px]">link</span>
+              LinkedIn
+            </a>
+          </div>
+        </footer>
+      </div>
+    </main>
+
+    <div class="fixed bottom-0 right-0 w-96 h-96 bg-primary opacity-[0.02] blur-[100px] pointer-events-none rounded-full -mr-48 -mb-48"></div>
+    <div class="fixed top-0 left-0 w-64 h-64 bg-primary opacity-[0.03] blur-[80px] pointer-events-none rounded-full -ml-32 -mt-32"></div>
+
+    <script>
+      function showError(message) {
+        const err = document.getElementById("errBox");
+        if (!err) return;
+        if (!message) {
+          err.textContent = "";
+          err.classList.add("hidden");
+          return;
+        }
+        err.textContent = String(message);
+        err.classList.remove("hidden");
+      }
+
+      function setBusy(busy) {
+        const btn = document.getElementById("btnSubmit");
+        const btnText = document.getElementById("btnText");
+        const btnIcon = document.getElementById("btnIcon");
+        const email = document.getElementById("email");
+        const password = document.getElementById("password");
+        if (!btn || !btnText || !btnIcon || !email || !password) return;
+        btn.disabled = !!busy;
+        email.disabled = !!busy;
+        password.disabled = !!busy;
+        if (!busy) {
+          btnText.textContent = "Sign In";
+          btnIcon.textContent = "arrow_forward";
+          return;
+        }
+        btnText.textContent = "Authenticating...";
+        btnIcon.textContent = "progress_activity";
+      }
+
+      function hookLabelColor() {
+        document.querySelectorAll("input").forEach((input) => {
+          input.addEventListener("focus", () => {
+            const label = input?.parentElement?.parentElement?.querySelector("label");
+            if (label) label.classList.replace("text-outline", "text-primary");
+          });
+          input.addEventListener("blur", () => {
+            const label = input?.parentElement?.parentElement?.querySelector("label");
+            if (label) label.classList.replace("text-primary", "text-outline");
+          });
+        });
+      }
+
+      async function redirectToDashboard() {
+        const res = await fetch("/api/auth/me", { cache: "no-store" });
+        if (!res.ok) throw new Error("Unauthorized");
+        const body = await res.json().catch(() => ({}));
+        const role = body?.user?.role;
+        if (!role) throw new Error("Unauthorized");
+        window.location.href = `/${encodeURIComponent(role)}/dashboard.html`;
+      }
+
+      (async function () {
+        hookLabelColor();
+        try {
+          // If already authenticated via cookies, go straight to the dashboard.
+          await redirectToDashboard();
+        } catch {
+          // stay on login
+        }
+
+        const form = document.getElementById("loginForm");
+        if (!form) return;
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          showError("");
+          setBusy(true);
+          try {
+            const email = document.getElementById("email").value.trim();
+            const password = document.getElementById("password").value;
+            const res = await fetch("/api/auth/login", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              cache: "no-store",
+              body: JSON.stringify({ email, password })
+            });
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              if (res.status === 401) throw new Error("Wrong credentials.");
+              throw new Error(body?.error || "Unable to sign in.");
+            }
+            await redirectToDashboard();
+          } catch (err) {
+            showError(err?.message || "Unable to sign in.");
+          } finally {
+            setBusy(false);
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>

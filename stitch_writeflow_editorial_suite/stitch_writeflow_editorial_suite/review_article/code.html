@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Manager Review Detail | LexisFlow</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Literata:ital,wght@0,400;0,500;0,600;0,700;1,400&amp;family=Geist:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-bright": "#fcf9f8",
+                        "on-tertiary-fixed": "#181c1e",
+                        "on-surface-variant": "#414845",
+                        "on-primary": "#ffffff",
+                        "secondary-container": "#e1e3e4",
+                        "on-primary-fixed": "#022018",
+                        "on-secondary-container": "#626566",
+                        "on-error": "#ffffff",
+                        "primary-fixed-dim": "#adcec0",
+                        "inverse-primary": "#adcec0",
+                        "secondary-fixed": "#e1e3e4",
+                        "on-secondary-fixed-variant": "#454748",
+                        "primary-fixed": "#c9eadc",
+                        "on-primary-container": "#759487",
+                        "inverse-on-surface": "#f3f0ef",
+                        "primary-container": "#0d2b22",
+                        "error": "#ba1a1a",
+                        "on-error-container": "#93000a",
+                        "secondary": "#5c5f60",
+                        "tertiary": "#0e1214",
+                        "on-tertiary-container": "#8a8e91",
+                        "surface": "#fcf9f8",
+                        "surface-container": "#f0eded",
+                        "tertiary-fixed-dim": "#c4c7ca",
+                        "on-secondary": "#ffffff",
+                        "background": "#fcf9f8",
+                        "secondary-fixed-dim": "#c5c7c8",
+                        "surface-dim": "#dcd9d9",
+                        "on-primary-fixed-variant": "#2f4c42",
+                        "on-tertiary-fixed-variant": "#43474a",
+                        "surface-variant": "#e5e2e1",
+                        "surface-container-high": "#eae7e7",
+                        "surface-tint": "#476459",
+                        "on-surface": "#1c1b1b",
+                        "tertiary-container": "#232729",
+                        "surface-container-highest": "#e5e2e1",
+                        "outline-variant": "#c1c8c3",
+                        "surface-container-low": "#f6f3f2",
+                        "inverse-surface": "#313030",
+                        "tertiary-fixed": "#e0e3e6",
+                        "primary": "#00150e",
+                        "on-tertiary": "#ffffff",
+                        "outline": "#727975",
+                        "surface-container-lowest": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "on-secondary-fixed": "#191c1d",
+                        "on-background": "#1c1b1b"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "margin-mobile": "16px",
+                        "xs": "0.5rem",
+                        "margin-desktop": "48px",
+                        "lg": "2.5rem",
+                        "sm": "1rem",
+                        "md": "1.5rem",
+                        "xl": "4rem",
+                        "gutter": "24px",
+                        "base": "4px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Literata"],
+                        "label-sm": ["Geist"],
+                        "body-md": ["Geist"],
+                        "body-lg": ["Geist"],
+                        "display-lg-mobile": ["Literata"],
+                        "display-lg": ["Literata"],
+                        "interface-md": ["Geist"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", { "lineHeight": "1.4", "fontWeight": "500" }],
+                        "label-sm": ["12px", { "lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "display-lg-mobile": ["32px", { "lineHeight": "1.25", "fontWeight": "600" }],
+                        "display-lg": ["48px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "interface-md": ["14px", { "lineHeight": "1.2", "fontWeight": "500" }]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            background-color: #fcf9f8;
+            color: #1c1b1b;
+            font-family: 'Geist', sans-serif;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #e1e3e4;
+            border-radius: 10px;
+        }
+        .shadow-soft {
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+        }
+    </style>
+</head>
+<body class="overflow-hidden">
+<!-- TopAppBar -->
+<header class="sticky top-0 z-50 flex justify-between items-center w-full px-margin-desktop py-4 bg-surface dark:bg-tertiary">
+<div class="flex items-center gap-8">
+<span class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed">LexisFlow</span>
+<nav class="hidden md:flex items-center gap-6">
+<a class="text-secondary dark:text-secondary-fixed-dim hover:text-primary-fixed-variant transition-colors font-label-sm text-label-sm" href="#">Dashboard</a>
+<a class="text-primary dark:text-primary-fixed font-bold border-b-2 border-primary transition-all font-label-sm text-label-sm" href="#">Articles</a>
+<a class="text-secondary dark:text-secondary-fixed-dim hover:text-primary-fixed-variant transition-colors font-label-sm text-label-sm" href="#">Team</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-on-surface-variant p-2 hover:bg-surface-container rounded-full transition-colors" data-icon="search">search</button>
+<button class="material-symbols-outlined text-on-surface-variant p-2 hover:bg-surface-container rounded-full transition-colors relative" data-icon="notifications">
+                notifications
+                <span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
+</button>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-outline-variant">
+<img alt="User avatar" data-alt="A professional headshot of a corporate manager with a clean, minimalist aesthetic. The lighting is soft and natural, emphasizing a calm and focused demeanor. The background is a blurred, high-end office space with neutral tones of white and light gray, reflecting the LexisFlow brand identity." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBy4wHMNrfNtWpGdIIuFi-TiikjaQVWoO073ThkoNQovd2S_UIsPPvb60nwmBQUDXgCB5TAI6ctRN3h6KEsI6ROb2sSXqHMgMXFleEeT-qGNNCsFVeVe4IYfc4Act-awSWHi0-VqbYh3lFTeBvksZCjtBot1EMk7AQeTw3uTMQdXs7lgw-b3EIEhCVfuRVtGNSt1hQxkv-TCeJbDzJFUB0bGd9LEInZR1L8YCZvfvHxJdhrjvYlCwMJysz3W4SyBx99NQYM90OEKkg"/>
+</div>
+</div>
+</header>
+<div class="flex h-[calc(100vh-72px)] overflow-hidden">
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-[72px] h-full w-[280px] hidden lg:flex flex-col py-md border-r border-outline-variant dark:border-on-tertiary-container bg-surface-container-low dark:bg-tertiary-container">
+<div class="px-6 mb-8 flex items-center gap-3">
+<div class="w-10 h-10 bg-primary-container rounded flex items-center justify-center">
+<span class="material-symbols-outlined text-primary-fixed" data-icon="auto_stories" style="font-variation-settings: 'FILL' 1;">auto_stories</span>
+</div>
+<div>
+<div class="font-interface-md text-interface-md text-primary font-bold">Editorial Hub</div>
+<div class="font-label-sm text-label-sm text-secondary">Enterprise Tier</div>
+</div>
+</div>
+<nav class="flex-1 flex flex-col gap-1 px-2">
+<a class="flex items-center gap-3 text-secondary dark:text-on-tertiary-container pl-4 py-3 hover:bg-surface-container transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-label-sm text-label-sm">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 text-secondary dark:text-on-tertiary-container pl-4 py-3 hover:bg-surface-container transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="folder_copy">folder_copy</span>
+<span class="font-label-sm text-label-sm">Projects</span>
+</a>
+<a class="flex items-center gap-3 text-primary dark:text-primary-fixed-dim font-bold border-l-2 border-primary dark:border-primary-fixed-dim pl-4 py-3 bg-surface-container-high dark:bg-tertiary scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined" data-icon="description" style="font-variation-settings: 'FILL' 1;">description</span>
+<span class="font-label-sm text-label-sm">Articles</span>
+</a>
+<a class="flex items-center gap-3 text-secondary dark:text-on-tertiary-container pl-4 py-3 hover:bg-surface-container transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="groups">groups</span>
+<span class="font-label-sm text-label-sm">Team</span>
+</a>
+<a class="flex items-center gap-3 text-secondary dark:text-on-tertiary-container pl-4 py-3 hover:bg-surface-container transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+<span class="font-label-sm text-label-sm">Payments</span>
+</a>
+<a class="flex items-center gap-3 text-secondary dark:text-on-tertiary-container pl-4 py-3 hover:bg-surface-container transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-label-sm text-label-sm">Settings</span>
+</a>
+</nav>
+<div class="mt-auto px-2 flex flex-col gap-1">
+<a class="flex items-center gap-3 text-secondary pl-4 py-3 hover:bg-surface-container transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+<span class="font-label-sm text-label-sm">Help Center</span>
+</a>
+<a class="flex items-center gap-3 text-secondary pl-4 py-3 hover:bg-surface-container transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span class="font-label-sm text-label-sm">Log Out</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area: Split View -->
+<main class="flex-1 lg:ml-[280px] flex flex-col md:flex-row h-full overflow-hidden bg-background">
+<!-- Left Panel: Article Content -->
+<section class="flex-1 flex flex-col border-r border-outline-variant bg-white overflow-hidden">
+<!-- Content Header -->
+<div class="px-md py-sm border-b border-outline-variant flex items-center justify-between">
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-secondary hover:text-primary transition-colors" data-icon="arrow_back">arrow_back</button>
+<div>
+<h1 class="font-headline-md text-headline-md text-primary">The Future of Generative Architecture</h1>
+<p class="font-label-sm text-label-sm text-secondary">Draft by <span class="text-primary font-bold">Julian Sterling</span> • Submitted 2h ago</p>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<div class="flex items-center gap-1 bg-surface-container-high px-3 py-1 rounded-full">
+<span class="material-symbols-outlined text-[16px] text-[#476459]" data-icon="verified_user" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+<span class="font-label-sm text-label-sm text-[#476459]">AI CHECK: 98% HUMAN</span>
+</div>
+<div class="flex items-center gap-1 bg-error-container px-3 py-1 rounded-full">
+<span class="material-symbols-outlined text-[16px] text-error" data-icon="warning" style="font-variation-settings: 'FILL' 1;">warning</span>
+<span class="font-label-sm text-label-sm text-error">PLAGIARISM: 12%</span>
+</div>
+</div>
+</div>
+<!-- Scrollable Writing Area -->
+<div class="flex-1 overflow-y-auto custom-scrollbar p-xl bg-surface-bright">
+<article class="max-w-2xl mx-auto space-y-8">
+<img class="w-full h-64 object-cover rounded shadow-soft border border-outline-variant" data-alt="A high-contrast architectural photograph of a futuristic building with flowing, organic curves. The structure is made of white matte concrete against a clear, pale blue sky. The lighting is sharp and minimalist, emphasizing the interplay of shadow and light on the building's surface, perfectly aligning with the article's theme of generative architecture." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBjs2HON9Gsf0YHRxGTMe8Hod7yQKPaDJW2blJM50Z0CvbPu0XOqS3GVkT6TK9J6V4Gkd0A3hOXwgBaRQCXzhUYvfJi5GVkwFGqhOHIn1o3pqVyX_meZigT9H2uQ4mtXBfsj7GcBgY284GV3dsTJjKhIT4FqO9V4rf_sPdqWFrh1Cku_weKWiF3XEdCNc6H1JY5dJsaIoYgIyM5MwfHxnntdAeazT7U7Yk0b0OYJcUidPMbAwmotkDoqKHhLwCtr1z9_BFt8NstN4g"/>
+<div class="space-y-6">
+<p class="font-body-lg text-body-lg text-primary leading-relaxed">
+                                As we enter a new epoch of digital craftsmanship, the boundaries between human intuition and machine calculation have begun to dissolve. Generative architecture is no longer a niche experimental field; it has become the fundamental substrate of modern urban planning.
+                            </p>
+<h2 class="font-headline-md text-headline-md text-primary pt-4">The Convergence of Logic and Form</h2>
+<p class="font-body-md text-body-md text-on-surface-variant leading-relaxed">
+                                Traditional CAD tools were reactive—vessels for the architect's specific commands. New generative engines, however, are proactive. By inputting environmental data, structural constraints, and material properties, designers are now curating families of solutions rather than drawing single outcomes. This shift requires a mental pivot from "creator" to "editor-in-chief" of an algorithmic process.
+                            </p>
+<blockquote class="border-l-4 border-primary-fixed-dim pl-6 py-2 italic font-headline-md text-secondary bg-surface-container-low">
+                                "The computer is no longer the pencil; it is the consultant, the engineer, and the visionary all at once."
+                            </blockquote>
+<p class="font-body-md text-body-md text-on-surface-variant leading-relaxed">
+                                Consider the recent redevelopment of the Waterfront District. Every curve of the boardwalk was optimized by a fluid-dynamics model to minimize wind tunnels and maximize seasonal sunlight. The result is a space that feels deeply organic, yet is mathematically perfect in its utility.
+                            </p>
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-surface p-4 border border-outline-variant rounded">
+<h4 class="font-label-sm text-label-sm uppercase mb-2">Technical Insight</h4>
+<p class="font-body-md text-interface-md italic">Parametric modeling reduces material waste by up to 34% by optimizing load-bearing geometries that were previously impossible to calculate manually.</p>
+</div>
+<div class="bg-surface p-4 border border-outline-variant rounded">
+<h4 class="font-label-sm text-label-sm uppercase mb-2">Public Reception</h4>
+<p class="font-body-md text-interface-md italic">Surveys indicate an 82% preference for generative spaces over standard geometric grids, citing a "restorative" psychological effect.</p>
+</div>
+</div>
+</div>
+</article>
+</div>
+</section>
+<!-- Right Panel: Review Actions -->
+<section class="w-full md:w-[320px] lg:w-[400px] flex flex-col bg-surface-container-low overflow-hidden">
+<div class="px-md py-sm border-b border-outline-variant">
+<h3 class="font-headline-md text-headline-md text-primary">Review Panel</h3>
+<p class="font-label-sm text-label-sm text-secondary">Finalize editorial status</p>
+</div>
+<div class="flex-1 overflow-y-auto custom-scrollbar p-md space-y-8">
+<!-- Integrity Stats Card -->
+<div class="bg-white border border-outline-variant p-4 rounded shadow-soft space-y-4">
+<div class="flex justify-between items-center">
+<span class="font-interface-md text-interface-md text-secondary">Readability Score</span>
+<span class="font-interface-md text-interface-md text-primary font-bold">Grade 11 (High)</span>
+</div>
+<div class="w-full bg-secondary-container h-1 rounded-full">
+<div class="bg-[#476459] h-1 rounded-full w-[85%]"></div>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-interface-md text-interface-md text-secondary">Sentiment</span>
+<span class="font-interface-md text-interface-md text-primary font-bold">Inspirational</span>
+</div>
+</div>
+<!-- Review Notes -->
+<div class="space-y-3">
+<label class="font-label-sm text-label-sm uppercase text-secondary">Editorial Feedback</label>
+<textarea class="w-full h-48 p-4 border border-outline-variant rounded font-body-md text-body-md focus:ring-1 focus:ring-primary focus:border-primary bg-white outline-none resize-none transition-all" placeholder="Provide specific feedback or context for your decision..."></textarea>
+<div class="flex items-center gap-2 text-on-tertiary-fixed cursor-pointer hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[18px]" data-icon="attach_file">attach_file</span>
+<span class="font-label-sm text-label-sm">Attach style guide reference</span>
+</div>
+</div>
+<!-- Workflow Actions -->
+<div class="space-y-4 pt-4 border-t border-outline-variant">
+<div class="flex flex-col gap-3">
+<button class="w-full py-4 bg-[#476459] text-white font-label-sm text-label-sm rounded hover:brightness-110 transition-all flex items-center justify-center gap-2 active:scale-95">
+<span class="material-symbols-outlined" data-icon="done_all">done_all</span>
+                                APPROVE &amp; PUBLISH
+                            </button>
+<div class="grid grid-cols-2 gap-3">
+<button class="py-3 border border-primary text-primary font-label-sm text-label-sm rounded hover:bg-surface transition-all flex items-center justify-center gap-2 active:scale-95">
+<span class="material-symbols-outlined" data-icon="edit_note">edit_note</span>
+                                    REWORK
+                                </button>
+<button class="py-3 border border-error text-error font-label-sm text-label-sm rounded hover:bg-error-container/20 transition-all flex items-center justify-center gap-2 active:scale-95">
+<span class="material-symbols-outlined" data-icon="close">close</span>
+                                    REJECT
+                                </button>
+</div>
+</div>
+<div class="bg-surface-container p-4 rounded-lg flex items-start gap-3">
+<span class="material-symbols-outlined text-secondary" data-icon="info">info</span>
+<p class="font-label-sm text-label-sm text-secondary leading-tight">Approving this article will automatically trigger the social media distribution pipeline scheduled for tomorrow 9:00 AM.</p>
+</div>
+</div>
+</div>
+</section>
+</main>
+</div>
+<!-- Micro-interaction Scripts -->
+<script>
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('mousedown', () => {
+                btn.style.transform = 'scale(0.98)';
+            });
+            btn.addEventListener('mouseup', () => {
+                btn.style.transform = 'scale(1)';
+            });
+            btn.addEventListener('mouseleave', () => {
+                btn.style.transform = 'scale(1)';
+            });
+        });
+
+        // Simple text area focus effect
+        const feedbackArea = document.querySelector('textarea');
+        feedbackArea.addEventListener('focus', () => {
+            feedbackArea.parentElement.classList.add('translate-x-1');
+            feedbackArea.parentElement.style.transition = 'all 0.3s ease';
+        });
+        feedbackArea.addEventListener('blur', () => {
+            feedbackArea.parentElement.classList.remove('translate-x-1');
+        });
+    </script>
+</body></html>

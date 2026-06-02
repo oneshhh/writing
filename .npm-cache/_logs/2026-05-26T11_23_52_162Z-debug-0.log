@@ -1,0 +1,58 @@
+0 verbose cli C:\Program Files\nodejs\node.exe C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js
+1 info using npm@10.9.3
+2 info using node@v22.19.0
+3 silly config load:file:C:\Program Files\nodejs\node_modules\npm\npmrc
+4 silly config load:file:C:\Users\Dell\Documents\Writing\backend\.npmrc
+5 silly config load:file:C:\Users\Dell\.npmrc
+6 silly config load:file:C:\Users\Dell\AppData\Roaming\npm\etc\npmrc
+7 verbose title npm install
+8 verbose argv "install"
+9 verbose logfile logs-max:10 dir:C:\Users\Dell\Documents\Writing\.npm-cache\_logs\2026-05-26T11_23_52_162Z-
+10 verbose logfile C:\Users\Dell\Documents\Writing\.npm-cache\_logs\2026-05-26T11_23_52_162Z-debug-0.log
+11 silly logfile done cleaning log files
+12 silly packumentCache heap:4345298944 maxSize:1086324736 maxEntrySize:543162368
+13 silly idealTree buildDeps
+14 silly fetch manifest @supabase/supabase-js@^2.49.1
+15 silly packumentCache full:https://registry.npmjs.org/@supabase%2fsupabase-js cache-miss
+16 http fetch GET https://registry.npmjs.org/@supabase%2fsupabase-js attempt 1 failed with EACCES
+17 http fetch GET https://registry.npmjs.org/@supabase%2fsupabase-js attempt 2 failed with EACCES
+18 http fetch GET https://registry.npmjs.org/@supabase%2fsupabase-js attempt 3 failed with EACCES
+19 silly fetch manifest cors@^2.8.5
+20 silly packumentCache full:https://registry.npmjs.org/cors cache-miss
+21 http fetch GET https://registry.npmjs.org/cors attempt 1 failed with EACCES
+22 http fetch GET https://registry.npmjs.org/cors attempt 2 failed with EACCES
+23 http fetch GET https://registry.npmjs.org/cors attempt 3 failed with EACCES
+24 silly fetch manifest docx@^9.5.1
+25 silly packumentCache full:https://registry.npmjs.org/docx cache-miss
+26 http fetch GET https://registry.npmjs.org/docx attempt 1 failed with EACCES
+27 http fetch GET https://registry.npmjs.org/docx attempt 2 failed with EACCES
+28 http fetch GET https://registry.npmjs.org/docx attempt 3 failed with EACCES
+29 silly fetch manifest dotenv@^16.6.1
+30 silly packumentCache full:https://registry.npmjs.org/dotenv cache-miss
+31 http fetch GET https://registry.npmjs.org/dotenv attempt 1 failed with EACCES
+32 http fetch GET https://registry.npmjs.org/dotenv attempt 2 failed with EACCES
+33 http fetch GET https://registry.npmjs.org/dotenv attempt 3 failed with EACCES
+34 silly fetch manifest express@^4.21.2
+35 silly packumentCache full:https://registry.npmjs.org/express cache-miss
+36 http fetch GET https://registry.npmjs.org/express attempt 1 failed with EACCES
+37 http fetch GET https://registry.npmjs.org/express attempt 2 failed with EACCES
+38 http fetch GET https://registry.npmjs.org/express attempt 3 failed with EACCES
+39 silly fetch manifest htmlparser2@^10.0.0
+40 silly packumentCache full:https://registry.npmjs.org/htmlparser2 cache-miss
+41 http fetch GET https://registry.npmjs.org/htmlparser2 attempt 1 failed with EACCES
+42 http fetch GET https://registry.npmjs.org/htmlparser2 attempt 2 failed with EACCES
+43 http fetch GET https://registry.npmjs.org/htmlparser2 attempt 3 failed with EACCES
+44 silly fetch manifest jose@^5.10.0
+45 silly packumentCache full:https://registry.npmjs.org/jose cache-miss
+46 http fetch GET https://registry.npmjs.org/jose attempt 1 failed with EACCES
+47 http fetch GET https://registry.npmjs.org/jose attempt 2 failed with EACCES
+48 http fetch GET https://registry.npmjs.org/jose attempt 3 failed with EACCES
+49 silly fetch manifest morgan@^1.10.0
+50 silly packumentCache full:https://registry.npmjs.org/morgan cache-miss
+51 http fetch GET https://registry.npmjs.org/morgan attempt 1 failed with EACCES
+52 http fetch GET https://registry.npmjs.org/morgan attempt 2 failed with EACCES
+53 http fetch GET https://registry.npmjs.org/morgan attempt 3 failed with EACCES
+54 silly fetch manifest multer@^1.4.5-lts.2
+55 silly packumentCache full:https://registry.npmjs.org/multer cache-miss
+56 http fetch GET https://registry.npmjs.org/multer attempt 1 failed with EACCES
+57 http fetch GET https://registry.npmjs.org/multer attempt 2 failed with EACCES

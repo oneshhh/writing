@@ -1,0 +1,121 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Real Write • Admin • Users</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+    <script src="/shared/config.js"></script>
+    <script src="/shared/app.js"></script>
+    <script src="/shared/topbar.js"></script>
+  </head>
+  <body>
+    <div class="topbar" id="topbar"></div>
+    <div class="wrap">
+      <div class="grid">
+        <div class="card" style="grid-column: span 6">
+          <h2>Create App User</h2>
+          <div class="muted">This creates a row in <code>public.users</code>. The Supabase Auth user must already exist.</div>
+          <div style="margin-top: 10px">
+            <label class="muted">Auth user id (uuid)</label>
+            <input id="id" placeholder="paste Supabase auth user UUID" />
+          </div>
+          <div class="two" style="margin-top: 10px">
+            <div>
+              <label class="muted">Email</label>
+              <input id="email" />
+            </div>
+            <div>
+              <label class="muted">Role</label>
+              <select id="role">
+                <option value="admin">admin</option>
+                <option value="manager">manager</option>
+                <option value="writer">writer</option>
+              </select>
+            </div>
+          </div>
+          <div style="margin-top: 10px">
+            <label class="muted">Full name</label>
+            <input id="name" />
+          </div>
+          <div class="right" style="margin-top: 12px">
+            <button id="create">Create</button>
+          </div>
+          <div class="muted" id="msg" style="margin-top: 10px"></div>
+        </div>
+        <div class="card" style="grid-column: span 6">
+          <h2>All Users</h2>
+          <table>
+            <thead><tr><th>Unique</th><th>Name</th><th>Role</th><th>Active</th><th></th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <script>
+      (async function () {
+        const user = await APP.requireRole("admin");
+        if (!user) return;
+        await renderTopbar({
+          role: user.role,
+          links: [
+            { href: "/admin/dashboard.html", label: "Dashboard" },
+            { href: "/admin/users.html", label: "Users" },
+            { href: "/admin/projects.html", label: "Projects" },
+            { href: "/admin/payments.html", label: "Payments" }
+          ]
+        });
+
+        const msg = (t) => (document.getElementById("msg").textContent = t || "");
+
+        async function refresh() {
+          APP.ui.tableSkeleton("rows", { rows: 7, cols: 5 });
+          const users = await APP.apiFetch("/api/users");
+          document.getElementById("rows").innerHTML = (users.users || [])
+            .map((u) => `<tr>
+              <td>${APP.escapeHtml(u.unique_id)}</td>
+              <td>${APP.escapeHtml(u.full_name)}<div class="muted">${APP.escapeHtml(u.email)}</div></td>
+              <td class="muted">${APP.escapeHtml(u.role)}</td>
+              <td>${u.is_active ? "<span class='badge b-approved'>active</span>" : "<span class='badge b-rejected'>inactive</span>"}</td>
+              <td class="right">
+                <button class="secondary" data-toggle="${u.id}" data-active="${u.is_active}">${u.is_active ? "Deactivate" : "Activate"}</button>
+              </td>
+            </tr>`)
+            .join("");
+          for (const b of document.querySelectorAll("button[data-toggle]")) {
+            b.onclick = async () => {
+              msg("");
+              try {
+                const id = b.getAttribute("data-toggle");
+                const next = b.getAttribute("data-active") !== "true";
+                await APP.apiFetch(`/api/users/${encodeURIComponent(id)}/status`, { method: "PATCH", body: JSON.stringify({ is_active: next }) });
+                await refresh();
+              } catch (e) { msg(e.message || String(e)); }
+            };
+          }
+        }
+        await refresh();
+
+        document.getElementById("create").onclick = async () => {
+          msg("");
+          try {
+            const body = {
+              id: document.getElementById("id").value.trim(),
+              email: document.getElementById("email").value.trim(),
+              full_name: document.getElementById("name").value.trim(),
+              role: document.getElementById("role").value
+            };
+            await APP.apiFetch("/api/auth/register", { method: "POST", body: JSON.stringify(body) });
+            document.getElementById("id").value = "";
+            document.getElementById("email").value = "";
+            document.getElementById("name").value = "";
+            await refresh();
+            msg("Created.");
+          } catch (e) {
+            msg(e.message || String(e));
+          }
+        };
+      })();
+    </script>
+  </body>
+</html>
