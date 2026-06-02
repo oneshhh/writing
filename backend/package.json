@@ -9,6 +9,7 @@
     "start": "node server.js"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
     "@supabase/supabase-js": "^2.49.1",
     "cors": "^2.8.5",
     "docx": "^9.5.1",
@@ -21,4 +22,3 @@
     "pdfkit": "^0.15.0"
   }
 }
-
