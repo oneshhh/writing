@@ -1,0 +1,146 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Real Write • Writer Dashboard</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+    <script src="/shared/config.js"></script>
+    <script src="/shared/app.js"></script>
+    <script src="/shared/topbar.js"></script>
+  </head>
+  <body>
+    <div class="topbar" id="topbar"></div>
+    <div class="wrap wide">
+      <div class="grid">
+        <div class="card">
+          <h3 id="welcome" style="margin:0"></h3>
+          <div class="muted" style="margin-top:6px">Pick an article to edit in <code>draft</code> or <code>rework</code>, or check remarks on rejected items.</div>
+        </div>
+        <div class="card">
+          <h2>My Article Status</h2>
+          <div class="row">
+            <div class="stat">
+              <div class="pill dot green">Approved</div>
+              <div class="n" id="nApproved">0</div>
+            </div>
+            <div class="stat">
+              <div class="pill dot red">Rejected</div>
+              <div class="n" id="nRejected">0</div>
+            </div>
+            <div class="stat">
+              <div class="pill dot amber">Rework</div>
+              <div class="n" id="nRework">0</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="right">
+            <a href="/writer/submit.html"><button>New article</button></a>
+          </div>
+          <h2>My Articles</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Project</th>
+                <th>Status</th>
+                <th>AI</th>
+                <th>Plagiarism</th>
+                <th>Updated</th>
+                <th>Remark</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+          <div class="right" style="margin-top: 12px">
+            <button class="secondary" id="prev">Previous</button>
+            <span class="muted" id="pageInfo"></span>
+            <button class="secondary" id="next">Next</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (async function () {
+        const user = await APP.requireRole("writer");
+        if (!user) return;
+        await renderTopbar({
+          role: user.role,
+          links: [{ href: "/writer/dashboard.html", label: "Dashboard" }, { href: "/writer/earnings.html", label: "Earnings" }]
+        });
+
+        document.getElementById("welcome").textContent = `Welcome, ${user.full_name || "Writer"}`;
+
+        APP.ui.textSkeleton("nApproved", { kind: "num", width: "54%" });
+        APP.ui.textSkeleton("nRejected", { kind: "num", width: "54%" });
+        APP.ui.textSkeleton("nRework", { kind: "num", width: "54%" });
+        APP.ui.tableSkeleton("rows", { rows: 8, cols: 9 });
+        APP.ui.textSkeleton("pageInfo", { kind: "line", width: "120px" });
+
+        const stats = await APP.apiFetch("/api/articles/stats/me");
+        APP.setText("nApproved", stats.counts.approved || 0);
+        APP.setText("nRejected", stats.counts.rejected || 0);
+        APP.setText("nRework", stats.counts.rework || 0);
+
+        const projects = await APP.apiFetch("/api/projects");
+        const projectName = new Map((projects.projects || []).map((p) => [p.id, p.title]));
+
+        const pageSize = 20;
+        let offset = 0;
+        let total = null;
+
+        function renderRows(rows) {
+          document.getElementById("rows").innerHTML = (rows || [])
+            .map((a) => {
+              const canEdit = a.status === "draft" || a.status === "rework";
+              return `
+                <tr>
+                  <td>${APP.escapeHtml(a.title)}</td>
+                  <td class="muted">${APP.escapeHtml(projectName.get(a.project_id) || a.project_id)}</td>
+                  <td>${APP.badgeForStatus(a.status)}</td>
+                  <td>${APP.checkBadge(a.ai_score)}</td>
+                  <td>${APP.checkBadge(a.plagiarism_score)}</td>
+                  <td class="muted">${APP.escapeHtml(new Date(a.updated_at || a.created_at).toLocaleString())}</td>
+                  <td class="muted">${APP.escapeHtml(a.manager_note || "")}</td>
+                  <td class="right">
+                    <a href="/writer/editor.html?id=${encodeURIComponent(a.id)}"><button class="secondary">${canEdit ? "Edit" : "View"}</button></a>
+                  </td>
+                </tr>`;
+            })
+            .join("");
+        }
+
+        function updatePager() {
+          const page = Math.floor(offset / pageSize) + 1;
+          const pages = total ? Math.max(1, Math.ceil(total / pageSize)) : null;
+          document.getElementById("prev").disabled = offset <= 0;
+          document.getElementById("next").disabled = total != null ? offset + pageSize >= total : false;
+          document.getElementById("pageInfo").textContent = pages ? `Page ${page} of ${pages}` : `Page ${page}`;
+        }
+
+        async function loadPage() {
+          APP.ui.tableSkeleton("rows", { rows: 8, cols: 9 });
+          const list = await APP.apiFetch(`/api/articles?limit=${pageSize}&offset=${offset}`);
+          total = list.total ?? total;
+          renderRows(list.articles || []);
+          updatePager();
+        }
+
+        document.getElementById("prev").onclick = async () => {
+          offset = Math.max(0, offset - pageSize);
+          await loadPage();
+        };
+        document.getElementById("next").onclick = async () => {
+          offset = offset + pageSize;
+          await loadPage();
+        };
+
+        await loadPage();
+      })();
+    </script>
+  </body>
+</html>

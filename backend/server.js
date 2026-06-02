@@ -50,9 +50,10 @@ app.use("/api", (_req, res, next) => {
   next();
 });
 
-// Serve the frontend (multi-page HTML) so users can run everything via :3000
-// while the API remains under /api.
-const frontendDir = path.join(__dirname, "..", "frontend");
+// Serve the frontend (multi-page HTML) locally. Vercel serves backend/public
+// directly from the CDN, while local dev falls back to ../frontend.
+const publicDir = path.join(__dirname, "public");
+const frontendDir = require("fs").existsSync(publicDir) ? publicDir : path.join(__dirname, "..", "frontend");
 app.use(
   express.static(frontendDir, {
     setHeaders: (res, filePath) => {
@@ -84,7 +85,11 @@ app.use((err, req, res, next) => {
   res.status(status).json({ error: safeMsg });
 });
 
-app.listen(port, () => {
-  // eslint-disable-next-line no-console
-  console.log(`API listening on http://localhost:${port}`);
-});
+if (!process.env.VERCEL) {
+  app.listen(port, () => {
+    // eslint-disable-next-line no-console
+    console.log(`API listening on http://localhost:${port}`);
+  });
+}
+
+module.exports = app;

@@ -1,0 +1,86 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Real Write • Writer • New Article</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+    <script src="/shared/config.js"></script>
+    <script src="/shared/app.js"></script>
+    <script src="/shared/topbar.js"></script>
+  </head>
+  <body>
+    <div class="topbar" id="topbar"></div>
+    <div class="wrap">
+      <div class="grid">
+        <div class="card" style="grid-column: span 7">
+          <h2>Create Article</h2>
+          <div class="two">
+            <div>
+              <label class="muted">Project</label>
+              <select id="project"></select>
+            </div>
+            <div>
+              <label class="muted">Type</label>
+              <select id="type">
+                <option value="news">news</option>
+                <option value="blog">blog</option>
+                <option value="review">review</option>
+                <option value="opinion">opinion</option>
+                <option value="tutorial">tutorial</option>
+                <option value="interview">interview</option>
+                <option value="other">other</option>
+              </select>
+            </div>
+          </div>
+          <div style="margin-top: 10px">
+            <label class="muted">Title</label>
+            <input id="title" placeholder="Article title" />
+          </div>
+          <div style="margin-top: 10px">
+            <label class="muted">Short description</label>
+            <textarea id="short" placeholder="1–3 lines summary"></textarea>
+          </div>
+          <div class="right" style="margin-top: 12px">
+            <a href="/writer/dashboard.html"><button class="secondary">Cancel</button></a>
+            <button id="create">Create</button>
+          </div>
+          <div class="muted" id="msg" style="margin-top: 10px"></div>
+        </div>
+        <div class="card" style="grid-column: span 5">
+          <h2>Next</h2>
+          <div class="muted">After creation you’ll land in the editor (Quill) to write and submit.</div>
+        </div>
+      </div>
+    </div>
+    <script>
+      (async function () {
+        const user = await APP.requireRole("writer");
+        if (!user) return;
+        await renderTopbar({ role: user.role, links: [{ href: "/writer/dashboard.html", label: "Dashboard" }] });
+
+        const projects = await APP.apiFetch("/api/projects");
+        document.getElementById("project").innerHTML = (projects.projects || [])
+          .map((p) => `<option value="${p.id}">${APP.escapeHtml(p.title)}</option>`)
+          .join("");
+
+        const msg = (t) => (document.getElementById("msg").textContent = t || "");
+        document.getElementById("create").onclick = async () => {
+          msg("");
+          try {
+            const body = {
+              project_id: document.getElementById("project").value,
+              article_type: document.getElementById("type").value,
+              title: document.getElementById("title").value.trim(),
+              short_description: document.getElementById("short").value
+            };
+            const created = await APP.apiFetch("/api/articles", { method: "POST", body: JSON.stringify(body) });
+            window.location.href = `/writer/editor.html?id=${encodeURIComponent(created.article.id)}`;
+          } catch (e) {
+            msg(e.message || String(e));
+          }
+        };
+      })();
+    </script>
+  </body>
+</html>

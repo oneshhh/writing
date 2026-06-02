@@ -1,0 +1,313 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Real Write • Admin • Payments</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+    <script src="/shared/config.js"></script>
+    <script src="/shared/app.js"></script>
+    <script src="/shared/topbar.js"></script>
+  </head>
+  <body>
+    <div class="topbar" id="topbar"></div>
+    <div class="wrap wide">
+      <div class="grid">
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+            <div>
+              <h2 style="margin:0">Payments</h2>
+              <div class="muted" style="margin-top:6px">View payments across all projects and writers.</div>
+            </div>
+            <div class="right" style="flex-wrap:wrap;">
+              <a href="/admin/projects.html"><button class="secondary" type="button">Projects</button></a>
+              <a href="/admin/users.html"><button class="secondary" type="button">Users</button></a>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>This Range</h2>
+          <div class="row">
+            <div class="stat">
+              <div class="pill dot green">Paid</div>
+              <div class="n" id="nPaid">0</div>
+            </div>
+            <div class="stat">
+              <div class="pill dot amber">Pending</div>
+              <div class="n" id="nPending">0</div>
+            </div>
+            <div class="stat">
+              <div class="pill dot blue">Payments</div>
+              <div class="n" id="nPayments">0</div>
+            </div>
+          </div>
+          <div class="muted" style="margin-top: 8px">Totals respect the filters below.</div>
+        </div>
+
+        <div class="card">
+          <h2>Payment History</h2>
+          <div class="two" style="margin: 10px 0 12px 0; align-items:end;">
+            <div>
+              <label class="muted">Project</label>
+              <select id="project"></select>
+            </div>
+            <div>
+              <label class="muted">Writer</label>
+              <select id="writer"></select>
+            </div>
+          </div>
+          <div class="two" style="margin: 0 0 12px 0; align-items:end;">
+            <div>
+              <label class="muted">From</label>
+              <input id="from" type="date" />
+            </div>
+            <div>
+              <label class="muted">To</label>
+              <input id="to" type="date" />
+            </div>
+          </div>
+          <div class="right" style="margin: 0 0 12px 0; flex-wrap: wrap;">
+            <button class="secondary" id="prevMonth" type="button">←</button>
+            <span class="pill" id="monthLabel">This month</span>
+            <button class="secondary" id="nextMonth" type="button">→</button>
+            <button class="secondary" id="apply" type="button">Apply</button>
+            <button class="secondary" id="clear" type="button">Reset</button>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Article</th>
+                <th>Writer</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Paid at</th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+          <div class="right" style="margin-top: 12px">
+            <button class="secondary" id="prev">Previous</button>
+            <span class="muted" id="pageInfo"></span>
+            <button class="secondary" id="next">Next</button>
+          </div>
+          <div class="muted" id="msg" style="margin-top: 10px"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (async function () {
+        const user = await APP.requireRole("admin");
+        if (!user) return;
+        await renderTopbar({
+          role: user.role,
+          links: [
+            { href: "/admin/dashboard.html", label: "Dashboard" },
+            { href: "/admin/users.html", label: "Users" },
+            { href: "/admin/projects.html", label: "Projects" },
+            { href: "/admin/payments.html", label: "Payments" }
+          ]
+        });
+
+        const msg = (t) => (document.getElementById("msg").textContent = t || "");
+        APP.ui.textSkeleton("nPaid", { kind: "num", width: "54%" });
+        APP.ui.textSkeleton("nPending", { kind: "num", width: "54%" });
+        APP.ui.textSkeleton("nPayments", { kind: "num", width: "54%" });
+        APP.ui.textSkeleton("pageInfo", { kind: "line", width: "120px" });
+
+        const pageSize = 20;
+        let offset = 0;
+        let total = null;
+        let currentMonth = new Date();
+        let projectId = "";
+        let writerId = "";
+
+        function setMonth(d) {
+          currentMonth = new Date(d.getFullYear(), d.getMonth(), 1);
+          const from = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+          const to = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+          const pad = (n) => String(n).padStart(2, "0");
+          document.getElementById("from").value = `${from.getFullYear()}-${pad(from.getMonth() + 1)}-${pad(from.getDate())}`;
+          document.getElementById("to").value = `${to.getFullYear()}-${pad(to.getMonth() + 1)}-${pad(to.getDate())}`;
+          document.getElementById("monthLabel").textContent = from.toLocaleString(undefined, { month: "long", year: "numeric" });
+        }
+
+        function buildQs({ includePaging } = { includePaging: true }) {
+          const qs = new URLSearchParams();
+          if (includePaging) {
+            qs.set("limit", String(pageSize));
+            qs.set("offset", String(offset));
+          }
+          if (projectId) qs.set("project_id", projectId);
+          if (writerId) qs.set("writer_id", writerId);
+
+          const fromVal = document.getElementById("from").value;
+          const toVal = document.getElementById("to").value;
+          if (fromVal) qs.set("from", new Date(fromVal + "T00:00:00").toISOString());
+          if (toVal) {
+            const dd = new Date(toVal + "T00:00:00");
+            dd.setDate(dd.getDate() + 1);
+            qs.set("to", dd.toISOString());
+          }
+          return qs;
+        }
+
+        async function refreshStats() {
+          const qs = buildQs({ includePaging: false });
+          const out = await APP.apiFetch(`/api/payments/stats?${qs.toString()}`);
+          document.getElementById("nPaid").textContent = `₹${Number(out.paid_amount || 0).toFixed(0)}`;
+          document.getElementById("nPending").textContent = `₹${Number(out.pending_amount || 0).toFixed(0)}`;
+          document.getElementById("nPayments").textContent = String(out.payments_count ?? 0);
+        }
+
+        function updatePager() {
+          const page = Math.floor(offset / pageSize) + 1;
+          const pages = total ? Math.max(1, Math.ceil(total / pageSize)) : null;
+          document.getElementById("prev").disabled = offset <= 0;
+          document.getElementById("next").disabled = total != null ? offset + pageSize >= total : false;
+          document.getElementById("pageInfo").textContent = pages ? `Page ${page} of ${pages}` : `Page ${page}`;
+        }
+
+        function renderRows(rows) {
+          document.getElementById("rows").innerHTML = (rows || [])
+            .map((p) => {
+              const a = p.articles;
+              const u = p.writer;
+              const title = a?.title || "Article";
+              const uid = a?.unique_id || p.article_id;
+              const aStatus = a?.status || "-";
+              const writer = u?.full_name || "Writer";
+              const email = u?.email || "";
+              return `<tr>
+                <td>
+                  <div style="font-weight:800">${APP.escapeHtml(title)}</div>
+                  <div class="muted">${APP.escapeHtml(uid)} • ${APP.escapeHtml(aStatus)}</div>
+                </td>
+                <td>
+                  <div style="font-weight:750">${APP.escapeHtml(writer)}</div>
+                  <div class="muted">${APP.escapeHtml(email)}</div>
+                </td>
+                <td>₹${APP.escapeHtml(Number(p.amount || 0).toFixed(0))}</td>
+                <td>${p.status === "paid" ? "<span class='badge b-approved'>paid</span>" : "<span class='badge b-submitted'>pending</span>"}</td>
+                <td class="muted">${APP.escapeHtml(new Date(p.created_at).toLocaleString())}</td>
+                <td class="muted">${p.paid_at ? APP.escapeHtml(new Date(p.paid_at).toLocaleString()) : "-"}</td>
+              </tr>`;
+            })
+            .join("");
+        }
+
+        async function loadPage() {
+          APP.ui.tableSkeleton("rows", { rows: 10, cols: 6 });
+          const qs = buildQs({ includePaging: true });
+          const out = await APP.apiFetch(`/api/payments?${qs.toString()}`);
+          total = out.total ?? total;
+          renderRows(out.payments || []);
+          updatePager();
+        }
+
+        async function loadProjects() {
+          const out = await APP.apiFetch("/api/projects");
+          const rows = out.projects || [];
+          const sel = document.getElementById("project");
+          sel.innerHTML = [`<option value="">All projects</option>`]
+            .concat(rows.map((p) => `<option value="${p.id}">${APP.escapeHtml(p.title)}</option>`))
+            .join("");
+        }
+
+        async function loadAllWriters() {
+          const out = await APP.apiFetch("/api/users/writers");
+          const sel = document.getElementById("writer");
+          sel.innerHTML = [`<option value="">All writers</option>`]
+            .concat(
+              (out.users || []).map((u) => `<option value="${u.id}">${APP.escapeHtml(u.full_name || "")} (${APP.escapeHtml(u.email || "")})</option>`)
+            )
+            .join("");
+        }
+
+        async function loadWritersForProject(pid) {
+          if (!pid) return loadAllWriters();
+          const out = await APP.apiFetch(`/api/projects/${encodeURIComponent(pid)}/writers`);
+          const sel = document.getElementById("writer");
+          sel.innerHTML = [`<option value="">All writers</option>`]
+            .concat(
+              (out.writers || []).map((w) => {
+                const name = w.users?.full_name || "Writer";
+                const email = w.users?.email || "";
+                return `<option value="${w.writer_id}">${APP.escapeHtml(name)}${email ? " (" + APP.escapeHtml(email) + ")" : ""}</option>`;
+              })
+            )
+            .join("");
+        }
+
+        document.getElementById("project").onchange = async (e) => {
+          projectId = e.target.value || "";
+          writerId = "";
+          await loadWritersForProject(projectId);
+          offset = 0;
+          await refreshStats();
+          await loadPage();
+        };
+        document.getElementById("writer").onchange = async (e) => {
+          writerId = e.target.value || "";
+          offset = 0;
+          await refreshStats();
+          await loadPage();
+        };
+
+        document.getElementById("apply").onclick = async () => {
+          offset = 0;
+          await refreshStats();
+          await loadPage();
+        };
+        document.getElementById("clear").onclick = async () => {
+          projectId = "";
+          writerId = "";
+          document.getElementById("project").value = "";
+          await loadAllWriters();
+          setMonth(new Date());
+          offset = 0;
+          await refreshStats();
+          await loadPage();
+        };
+        document.getElementById("prevMonth").onclick = async () => {
+          const d = new Date(currentMonth);
+          d.setMonth(d.getMonth() - 1);
+          setMonth(d);
+          offset = 0;
+          await refreshStats();
+          await loadPage();
+        };
+        document.getElementById("nextMonth").onclick = async () => {
+          const d = new Date(currentMonth);
+          d.setMonth(d.getMonth() + 1);
+          setMonth(d);
+          offset = 0;
+          await refreshStats();
+          await loadPage();
+        };
+
+        document.getElementById("prev").onclick = async () => {
+          offset = Math.max(0, offset - pageSize);
+          await loadPage();
+        };
+        document.getElementById("next").onclick = async () => {
+          offset = offset + pageSize;
+          await loadPage();
+        };
+
+        try {
+          setMonth(new Date());
+          await loadProjects();
+          await loadAllWriters();
+          await refreshStats();
+          await loadPage();
+        } catch (e) {
+          msg(e.message || String(e));
+        }
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,166 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Real Write • Manager • Review</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+    <script src="/shared/config.js"></script>
+    <script src="/shared/app.js"></script>
+    <script src="/shared/topbar.js"></script>
+  </head>
+  <body>
+    <div class="topbar" id="topbar"></div>
+    <div class="wrap wide">
+      <div class="grid">
+        <div class="card" style="grid-column: span 4">
+          <h2>Submitted Queue</h2>
+          <table>
+            <thead><tr><th>Title</th><th>AI</th><th>Plagiarism</th><th></th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+        <div class="card" style="grid-column: span 8">
+          <h2>Review</h2>
+          <div class="muted" id="selHint">Select an article from the queue.</div>
+          <div id="panel" class="hidden">
+            <div class="badge" id="status"></div>
+            <h3 id="title" style="margin: 10px 0 0 0"></h3>
+            <div class="muted" id="short"></div>
+            <div style="margin-top: 10px; display:flex; gap:10px; flex-wrap:wrap;">
+              <span class="pill">AI: <span id="aiScore"></span></span>
+              <span class="pill">Plagiarism: <span id="plagScore"></span></span>
+              <button class="secondary" id="runChecks" type="button">Run checks</button>
+            </div>
+            <div style="margin-top: 10px; border: 1px solid rgba(229,226,225,0.95); border-radius: 18px; padding: 12px; background: rgba(255,255,255,.7)">
+              <div class="muted">Long description</div>
+              <div id="long" style="margin-top: 8px; max-height: 560px; overflow:auto; padding-right:6px"></div>
+            </div>
+            <div style="margin-top: 10px">
+              <label class="muted">Remark (visible to writer)</label>
+              <textarea id="note"></textarea>
+            </div>
+            <div class="right" style="margin-top: 12px">
+              <button class="danger" id="reject">Reject</button>
+              <button class="secondary" id="rework">Rework</button>
+              <button id="approve">Approve</button>
+            </div>
+            <div class="muted" id="msg" style="margin-top: 10px"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+      (async function () {
+        const user = await APP.requireRole("manager");
+        if (!user) return;
+        await renderTopbar({
+          role: user.role,
+          links: [
+            { href: "/manager/dashboard.html", label: "Dashboard" },
+            { href: "/manager/review.html", label: "Review" },
+            { href: "/manager/payments.html", label: "Payments" }
+          ]
+        });
+
+        const msg = (t) => (document.getElementById("msg").textContent = t || "");
+        let selected = null;
+
+        const params = new URLSearchParams(window.location.search);
+        const openId = params.get("id");
+
+        async function refresh() {
+          APP.ui.tableSkeleton("rows", { rows: 8, cols: 4 });
+          const list = await APP.apiFetch("/api/articles");
+          const submitted = (list.articles || []).filter((a) => a.status === "submitted");
+          document.getElementById("rows").innerHTML = submitted
+            .map((a) => `<tr>
+              <td>${APP.escapeHtml(a.title)}</td>
+              <td>${APP.checkBadge(a.ai_score)}</td>
+              <td>${APP.checkBadge(a.plagiarism_score)}</td>
+              <td class="right"><button class="secondary" data-id="${a.id}">Open</button></td>
+            </tr>`)
+            .join("");
+          for (const btn of document.querySelectorAll("button[data-id]")) {
+            btn.onclick = () => open(submitted.find((x) => x.id === btn.getAttribute("data-id")));
+          }
+        }
+
+        async function openById(id) {
+          if (!id) return;
+          try {
+            const out = await APP.apiFetch(`/api/articles/${encodeURIComponent(id)}`);
+            open(out.article);
+          } catch (e) {
+            msg(e.message || String(e));
+          }
+        }
+
+        function open(a) {
+          selected = a;
+          document.getElementById("selHint").classList.add("hidden");
+          document.getElementById("panel").classList.remove("hidden");
+          document.getElementById("status").innerHTML = APP.badgeForStatus(a.status);
+          document.getElementById("title").textContent = a.title || "";
+          document.getElementById("short").textContent = a.short_description || "";
+          document.getElementById("long").innerHTML = a.long_description || "";
+          document.getElementById("note").value = "";
+          document.getElementById("aiScore").innerHTML = APP.checkBadge(a.ai_score);
+          document.getElementById("plagScore").innerHTML = APP.checkBadge(a.plagiarism_score);
+          msg("");
+        }
+
+        async function act(action) {
+          msg("");
+          if (!selected) return;
+          try {
+            const symbol = action === "approved" ? "check_circle" : action === "rework" ? "undo" : "cancel";
+            await APP.ui.runActionOverlay({
+              title: action === "approved" ? "Approving..." : action === "rework" ? "Sending for rework..." : "Rejecting...",
+              sub: "Updating article status",
+              successSymbol: symbol,
+              errorSymbol: "error",
+              action: async () =>
+                APP.apiFetch(`/api/articles/${encodeURIComponent(selected.id)}/review`, {
+                  method: "POST",
+                  body: JSON.stringify({ action, manager_note: document.getElementById("note").value })
+                })
+            });
+            selected = null;
+            document.getElementById("panel").classList.add("hidden");
+            document.getElementById("selHint").classList.remove("hidden");
+            await refresh();
+          } catch (e) {
+            msg(e.message || String(e));
+          }
+        }
+
+        document.getElementById("runChecks").onclick = async () => {
+          msg("");
+          if (!selected) return;
+          try {
+            const out = await APP.ui.runActionOverlay({
+              title: "Running checks...",
+              sub: "AI + plagiarism",
+              successSymbol: "done_all",
+              errorSymbol: "error",
+              action: async () => APP.apiFetch(`/api/articles/${encodeURIComponent(selected.id)}/checks`, { method: "POST" })
+            });
+            selected = out.article;
+            open(selected);
+            await refresh();
+          } catch (e) {
+            msg(e.message || String(e));
+          }
+        };
+
+        document.getElementById("approve").onclick = () => act("approved");
+        document.getElementById("reject").onclick = () => act("rejected");
+        document.getElementById("rework").onclick = () => act("rework");
+
+        await refresh();
+        if (openId) await openById(openId);
+      })();
+    </script>
+  </body>
+</html>

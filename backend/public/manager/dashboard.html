@@ -1,0 +1,67 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Real Write • Manager Dashboard</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+    <script src="/shared/config.js"></script>
+    <script src="/shared/app.js"></script>
+    <script src="/shared/topbar.js"></script>
+  </head>
+  <body>
+    <div class="topbar" id="topbar"></div>
+    <div class="wrap wide">
+      <div class="grid">
+        <div class="card">
+          <h3 id="welcome" style="margin:0"></h3>
+          <div class="muted" style="margin-top:6px">Manage projects, assign writers, and review submitted articles.</div>
+        </div>
+        <div class="card">
+          <h2>My Projects</h2>
+          <div class="right" style="margin-bottom: 10px; flex-wrap: wrap;">
+            <a href="/manager/projects.html"><button>Manage projects</button></a>
+            <a href="/manager/review.html"><button class="secondary">Review queue</button></a>
+            <a href="/manager/payments.html"><button class="secondary">Payments</button></a>
+          </div>
+          <table>
+            <thead>
+              <tr><th>Title</th><th>Status</th><th>AI</th><th>Plagiarism</th><th></th></tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <script>
+      (async function () {
+        const user = await APP.requireRole("manager");
+        if (!user) return;
+        await renderTopbar({
+          role: user.role,
+          links: [
+            { href: "/manager/dashboard.html", label: "Dashboard" },
+            { href: "/manager/review.html", label: "Review" },
+            { href: "/manager/payments.html", label: "Payments" }
+          ]
+        });
+
+        document.getElementById("welcome").textContent = `Welcome, ${user.full_name || "Manager"}`;
+
+        APP.ui.tableSkeleton("rows", { rows: 8, cols: 5 });
+        const projects = await APP.apiFetch("/api/projects");
+        document.getElementById("rows").innerHTML = (projects.projects || [])
+          .map((p) => `<tr>
+            <td>${APP.escapeHtml(p.title)}</td>
+            <td class="muted">${APP.escapeHtml(p.status)}</td>
+            <td class="muted">${p.ai_check_enabled ? "ON" : "OFF"}</td>
+            <td class="muted">${p.plagiarism_check_enabled ? "ON" : "OFF"}</td>
+            <td class="right">
+              <a href="/manager/project-detail.html?id=${encodeURIComponent(p.id)}"><button class="secondary">Open</button></a>
+            </td>
+          </tr>`)
+          .join("");
+      })();
+    </script>
+  </body>
+</html>

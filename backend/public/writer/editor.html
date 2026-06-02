@@ -1,0 +1,190 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Real Write • Writer • Editor</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+    <link href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" rel="stylesheet" />
+    <script src="/shared/config.js"></script>
+    <script src="/shared/app.js"></script>
+    <script src="/shared/topbar.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
+  </head>
+  <body>
+    <div class="topbar" id="topbar"></div>
+    <div class="wrap wide">
+      <div class="grid">
+        <div class="card" style="grid-column: span 12">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+            <h2 style="margin:0">Article</h2>
+            <a href="/writer/dashboard.html"><button class="secondary" type="button">Back</button></a>
+          </div>
+          <div class="two">
+            <div>
+              <label class="muted">Title</label>
+              <input id="title" />
+            </div>
+            <div>
+              <label class="muted">SEO tags (comma separated)</label>
+              <input id="tags" placeholder="tag1, tag2" />
+            </div>
+          </div>
+          <div style="margin-top: 10px">
+            <label class="muted">Short description</label>
+            <textarea id="short"></textarea>
+            <div class="muted" style="margin-top:6px; display:flex; justify-content:flex-end;">
+              <span id="shortWords">0 words</span>
+            </div>
+          </div>
+          <div style="margin-top: 10px">
+            <label class="muted">Long description</label>
+            <div id="editor"></div>
+            <div class="muted" style="margin-top:6px; display:flex; justify-content:flex-end;">
+              <span id="longWords">0 words</span>
+            </div>
+          </div>
+          <div class="right" style="margin-top: 12px">
+            <span class="badge" id="statusBadge"></span>
+            <button class="secondary" id="save">Save draft</button>
+            <button id="submit">Submit</button>
+          </div>
+          <div id="checks" style="margin-top: 10px; display:flex; gap:10px; flex-wrap:wrap;"></div>
+          <div id="remark" class="muted" style="margin-top: 10px"></div>
+          <div class="muted" id="msg" style="margin-top: 10px"></div>
+        </div>
+      </div>
+    </div>
+    <script>
+      (async function () {
+        const user = await APP.requireRole("writer");
+        if (!user) return;
+        await renderTopbar({ role: user.role, links: [{ href: "/writer/dashboard.html", label: "Dashboard" }] });
+
+        const params = new URLSearchParams(window.location.search);
+        const id = params.get("id");
+        if (!id) { window.location.href = "/writer/dashboard.html"; return; }
+
+        const quill = new Quill("#editor", {
+          theme: "snow",
+          placeholder: "Write your article here...",
+          modules: {
+            toolbar: [
+              [{ font: [] }, { size: ["small", false, "large", "huge"] }],
+              [{ header: [1, 2, 3, 4, 5, 6, false] }],
+              ["bold", "italic", "underline", "strike"],
+              [{ color: [] }, { background: [] }],
+              [{ script: "sub" }, { script: "super" }],
+              [{ list: "ordered" }, { list: "bullet" }, { indent: "-1" }, { indent: "+1" }],
+              [{ direction: "rtl" }, { align: [] }],
+              ["blockquote", "code-block"],
+              ["link", "image"],
+              ["clean"]
+            ]
+          },
+          clipboard: { matchVisual: false },
+          history: { delay: 900, maxStack: 120, userOnly: true }
+        });
+
+        const msg = (t) => (document.getElementById("msg").textContent = t || "");
+
+        const countWords = (text) => {
+          const t = String(text || "").replace(/\s+/g, " ").trim();
+          if (!t) return 0;
+          return t.split(" ").length;
+        };
+
+        const renderShortCount = () => {
+          const n = countWords(document.getElementById("short").value);
+          document.getElementById("shortWords").textContent = `${n} word${n === 1 ? "" : "s"}`;
+        };
+
+        const renderLongCount = () => {
+          // Quill getText includes a trailing newline; trim handles it.
+          const n = countWords(quill.getText());
+          document.getElementById("longWords").textContent = `${n} word${n === 1 ? "" : "s"}`;
+        };
+
+        APP.ui.textSkeleton("statusBadge", { kind: "line", width: "80px" });
+        document.getElementById("title").disabled = true;
+        document.getElementById("tags").disabled = true;
+        document.getElementById("short").disabled = true;
+        document.getElementById("save").disabled = true;
+        document.getElementById("submit").disabled = true;
+
+        const list = await APP.apiFetch("/api/articles");
+        const article = (list.articles || []).find((a) => a.id === id);
+        if (!article) { msg("Article not found."); return; }
+
+        document.getElementById("title").value = article.title || "";
+        document.getElementById("short").value = article.short_description || "";
+        document.getElementById("tags").value = Array.isArray(article.seo_tags) ? article.seo_tags.join(", ") : "";
+        quill.root.innerHTML = article.long_description || "";
+        document.getElementById("statusBadge").innerHTML = APP.badgeForStatus(article.status);
+        document.getElementById("checks").innerHTML = `
+          <span class="pill">AI: ${APP.checkBadge(article.ai_score)}</span>
+          <span class="pill">Plagiarism: ${APP.checkBadge(article.plagiarism_score)}</span>
+        `;
+        document.getElementById("remark").textContent =
+          article.manager_note ? `Remark from manager: ${article.manager_note}` : "";
+
+        renderShortCount();
+        renderLongCount();
+        document.getElementById("short").addEventListener("input", renderShortCount);
+        quill.on("text-change", renderLongCount);
+
+        const canEdit = article.status === "draft" || article.status === "rework";
+        if (!canEdit) {
+          document.getElementById("save").disabled = true;
+          document.getElementById("submit").disabled = true;
+          msg("This article is read-only in its current status.");
+        } else {
+          document.getElementById("title").disabled = false;
+          document.getElementById("tags").disabled = false;
+          document.getElementById("short").disabled = false;
+          document.getElementById("save").disabled = false;
+          document.getElementById("submit").disabled = false;
+        }
+
+        async function save() {
+          const tags = document.getElementById("tags").value
+            .split(",")
+            .map((t) => t.trim())
+            .filter(Boolean);
+          const body = {
+            title: document.getElementById("title").value.trim(),
+            short_description: document.getElementById("short").value,
+            long_description: quill.root.innerHTML,
+            seo_tags: tags
+          };
+          const updated = await APP.apiFetch(`/api/articles/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(body) });
+          document.getElementById("statusBadge").innerHTML = APP.badgeForStatus(updated.article.status);
+        }
+
+        document.getElementById("save").onclick = async () => {
+          msg("");
+          try { await save(); msg("Saved."); } catch (e) { msg(e.message || String(e)); }
+        };
+        document.getElementById("submit").onclick = async () => {
+          msg("");
+          try {
+            await APP.ui.runActionOverlay({
+              title: "Submitting...",
+              sub: "Sending to manager review",
+              successSymbol: "check_circle",
+              errorSymbol: "error",
+              action: async () => {
+                await save();
+                return APP.apiFetch(`/api/articles/${encodeURIComponent(id)}/submit`, { method: "POST" });
+              }
+            });
+            msg("Submitted to manager.");
+            setTimeout(() => (window.location.href = "/writer/dashboard.html"), 600);
+          } catch (e) {
+            msg(e.message || String(e));
+          }
+        };
+      })();
+    </script>
+  </body>
+</html>
