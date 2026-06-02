@@ -1,5 +1,19 @@
 /* global APP_CONFIG */
 
+const DEFAULT_LOADER_DELAY_MS = 450;
+const ACTION_RESULT_VISIBLE_MS = 280;
+
+function getLoaderState() {
+  if (!window.__rwLoaderState) {
+    window.__rwLoaderState = {
+      count: 0,
+      timer: null,
+      visible: false
+    };
+  }
+  return window.__rwLoaderState;
+}
+
 function ensureLoader() {
   if (document.getElementById("rwLoader")) return;
   const el = document.createElement("div");
@@ -54,17 +68,27 @@ function toast(message, { kind = "error", ttlMs = 6500 } = {}) {
 }
 
 function loaderOn() {
+  const state = getLoaderState();
   ensureLoader();
   document.getElementById("rwLoader").classList.add("on");
+  state.visible = true;
 }
 
 function loaderOff() {
+  const state = getLoaderState();
+  if (state.timer) {
+    clearTimeout(state.timer);
+    state.timer = null;
+  }
   const el = document.getElementById("rwLoader");
   if (el) el.classList.remove("on");
+  state.visible = false;
 }
 
-function beginLoading(label, { sub } = {}) {
-  window.__rwLoadCount = (window.__rwLoadCount || 0) + 1;
+function beginLoading(label, { sub, delayMs = DEFAULT_LOADER_DELAY_MS } = {}) {
+  const state = getLoaderState();
+  state.count += 1;
+  window.__rwLoadCount = state.count;
   ensureLoader();
 
   const titleEl = document.getElementById("rwLoaderTitle");
@@ -77,18 +101,44 @@ function beginLoading(label, { sub } = {}) {
   if (spinner) spinner.classList.remove("hidden");
   if (symbol) symbol.classList.add("hidden");
 
-  loaderOn();
+  if (state.visible || state.timer) return;
+
+  const waitMs = Math.max(0, Number(delayMs) || 0);
+  if (waitMs === 0) {
+    loaderOn();
+    return;
+  }
+
+  state.timer = setTimeout(() => {
+    state.timer = null;
+    if (state.count > 0) loaderOn();
+  }, waitMs);
 }
 
 function endLoading() {
-  window.__rwLoadCount = Math.max(0, (window.__rwLoadCount || 0) - 1);
-  if ((window.__rwLoadCount || 0) === 0) loaderOff();
+  const state = getLoaderState();
+  state.count = Math.max(0, state.count - 1);
+  window.__rwLoadCount = state.count;
+  if (state.count === 0) loaderOff();
+}
+
+function isLoaderVisible() {
+  return getLoaderState().visible && document.getElementById("rwLoader")?.classList.contains("on");
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function runActionOverlay({ title, sub, successSymbol = "check_circle", errorSymbol = "error", action }) {
   beginLoading(title || "Working...", { sub: sub || "Please wait..." });
   try {
     const result = await action();
+    if (!isLoaderVisible()) {
+      endLoading();
+      return result;
+    }
+
     const spinner = document.getElementById("rwLoaderSpinner");
     const symbol = document.getElementById("rwLoaderSymbol");
     if (spinner) spinner.classList.add("hidden");
@@ -100,9 +150,15 @@ async function runActionOverlay({ title, sub, successSymbol = "check_circle", er
       symbol.classList.add("rw-loader-pop");
       setTimeout(() => symbol.classList.remove("rw-loader-pop"), 450);
     }
-    setTimeout(() => endLoading(), 520);
+    await delay(ACTION_RESULT_VISIBLE_MS);
+    endLoading();
     return result;
   } catch (e) {
+    if (!isLoaderVisible()) {
+      endLoading();
+      throw e;
+    }
+
     const spinner = document.getElementById("rwLoaderSpinner");
     const symbol = document.getElementById("rwLoaderSymbol");
     if (spinner) spinner.classList.add("hidden");
@@ -114,15 +170,16 @@ async function runActionOverlay({ title, sub, successSymbol = "check_circle", er
       symbol.classList.add("rw-loader-pop");
       setTimeout(() => symbol.classList.remove("rw-loader-pop"), 450);
     }
-    setTimeout(() => endLoading(), 650);
+    await delay(ACTION_RESULT_VISIBLE_MS);
+    endLoading();
     throw e;
   }
 }
 
 async function apiFetch(path, options) {
-  const { skipLoader, ...fetchOptions } = options || {};
+  const { skipLoader, loaderDelayMs = DEFAULT_LOADER_DELAY_MS, ...fetchOptions } = options || {};
   const useLoader = !skipLoader;
-  if (useLoader) beginLoading("Loading");
+  if (useLoader) beginLoading("Loading", { delayMs: loaderDelayMs });
   try {
     const headers = new Headers((fetchOptions && fetchOptions.headers) || {});
     const isForm = typeof FormData !== "undefined" && fetchOptions?.body instanceof FormData;
