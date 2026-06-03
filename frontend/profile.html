@@ -11,34 +11,58 @@
   </head>
   <body>
     <div class="topbar" id="topbar"></div>
-    <div class="wrap">
+    <div class="wrap profile-page">
       <div class="grid">
         <div class="card profile-card">
-          <h2>Profile</h2>
-          <div style="display:grid;gap:12px">
+          <div class="profile-card-head">
             <div>
-              <label class="muted">First name</label>
-              <input id="firstName" disabled />
+              <h2>Profile</h2>
+              <div class="muted">Your account details</div>
             </div>
+            <span class="material-symbols-outlined" aria-hidden="true">account_circle</span>
+          </div>
+
+          <div class="profile-summary">
+            <div class="profile-avatar" id="profileAvatar">U</div>
             <div>
-              <label class="muted">Email</label>
-              <input id="email" disabled />
+              <div class="profile-name" id="profileName">User</div>
+              <div class="profile-role" id="profileRole">role</div>
             </div>
-            <div class="two">
+          </div>
+
+          <div class="profile-fields">
+            <div class="profile-field">
+              <span class="material-symbols-outlined" aria-hidden="true">badge</span>
               <div>
-                <label class="muted">Role</label>
-                <input id="role" disabled />
+                <label>First name</label>
+                <div id="firstName">-</div>
               </div>
+            </div>
+            <div class="profile-field">
+              <span class="material-symbols-outlined" aria-hidden="true">mail</span>
               <div>
-                <label class="muted">User ID</label>
-                <input id="uniqueId" disabled />
+                <label>Email</label>
+                <div id="email">-</div>
+              </div>
+            </div>
+            <div class="profile-field">
+              <span class="material-symbols-outlined" aria-hidden="true">fingerprint</span>
+              <div>
+                <label>User ID</label>
+                <div id="uniqueId">-</div>
               </div>
             </div>
           </div>
         </div>
 
         <div class="card profile-password-card">
-          <h2>Change Password</h2>
+          <div class="profile-card-head">
+            <div>
+              <h2>Change Password</h2>
+              <div class="muted">Use a strong password only you know</div>
+            </div>
+            <span class="material-symbols-outlined" aria-hidden="true">lock_reset</span>
+          </div>
           <form id="passwordForm" style="display:grid;gap:12px">
             <div>
               <label class="muted">Current password</label>
@@ -54,7 +78,7 @@
                 <input id="confirmPassword" type="password" autocomplete="new-password" />
               </div>
             </div>
-            <div class="muted" id="passwordRules" style="line-height:1.8"></div>
+            <div class="password-rules" id="passwordRules"></div>
             <div class="right">
               <button id="savePassword" type="submit">Update password</button>
             </div>
@@ -91,10 +115,13 @@
         const profileOut = await APP.apiFetch("/api/profile");
         const profile = profileOut.profile || {};
         const firstName = profile.first_name || String(profile.full_name || "").trim().split(/\s+/)[0] || "";
-        document.getElementById("firstName").value = firstName;
-        document.getElementById("email").value = profile.email || "";
-        document.getElementById("role").value = profile.role || "";
-        document.getElementById("uniqueId").value = profile.unique_id || "";
+        const displayName = profile.full_name || firstName || "User";
+        document.getElementById("profileAvatar").textContent = String(firstName || displayName || "U").slice(0, 1).toUpperCase();
+        document.getElementById("profileName").textContent = displayName;
+        document.getElementById("profileRole").textContent = profile.role || "role";
+        document.getElementById("firstName").textContent = firstName || "-";
+        document.getElementById("email").textContent = profile.email || "-";
+        document.getElementById("uniqueId").textContent = profile.unique_id || "-";
 
         const currentPassword = document.getElementById("currentPassword");
         const newPassword = document.getElementById("newPassword");
@@ -132,9 +159,23 @@
           const mismatch = confirmPassword.value && newPassword.value !== confirmPassword.value;
           const missingFields = !currentPassword.value || !newPassword.value || !confirmPassword.value;
           rulesEl.innerHTML = checks
-            .map((check) => `${check.ok ? "<span class='badge b-approved'>OK</span>" : "<span class='badge b-draft'>Need</span>"} ${APP.escapeHtml(check.text)}`)
-            .join("<br />");
-          if (mismatch) rulesEl.innerHTML += "<br /><span class='badge b-rejected'>Need</span> Passwords match";
+            .map(
+              (check) => `
+                <div class="password-rule ${check.ok ? "ok" : ""}">
+                  <span class="material-symbols-outlined" aria-hidden="true">${check.ok ? "check_circle" : "radio_button_unchecked"}</span>
+                  <span>${APP.escapeHtml(check.text)}</span>
+                </div>
+              `
+            )
+            .join("");
+          if (mismatch) {
+            rulesEl.innerHTML += `
+              <div class="password-rule bad">
+                <span class="material-symbols-outlined" aria-hidden="true">error</span>
+                <span>Passwords match</span>
+              </div>
+            `;
+          }
           saveBtn.disabled = checks.some((check) => !check.ok) || missingFields || newPassword.value !== confirmPassword.value;
         }
 
