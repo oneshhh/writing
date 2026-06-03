@@ -1,0 +1,175 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Real Write - Profile</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+    <script src="/shared/config.js"></script>
+    <script src="/shared/app.js"></script>
+    <script src="/shared/topbar.js"></script>
+  </head>
+  <body>
+    <div class="topbar" id="topbar"></div>
+    <div class="wrap">
+      <div class="grid">
+        <div class="card profile-card">
+          <h2>Profile</h2>
+          <div style="display:grid;gap:12px">
+            <div>
+              <label class="muted">First name</label>
+              <input id="firstName" disabled />
+            </div>
+            <div>
+              <label class="muted">Email</label>
+              <input id="email" disabled />
+            </div>
+            <div class="two">
+              <div>
+                <label class="muted">Role</label>
+                <input id="role" disabled />
+              </div>
+              <div>
+                <label class="muted">User ID</label>
+                <input id="uniqueId" disabled />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card profile-password-card">
+          <h2>Change Password</h2>
+          <form id="passwordForm" style="display:grid;gap:12px">
+            <div>
+              <label class="muted">Current password</label>
+              <input id="currentPassword" type="password" autocomplete="current-password" />
+            </div>
+            <div class="two">
+              <div>
+                <label class="muted">New password</label>
+                <input id="newPassword" type="password" autocomplete="new-password" />
+              </div>
+              <div>
+                <label class="muted">Confirm new password</label>
+                <input id="confirmPassword" type="password" autocomplete="new-password" />
+              </div>
+            </div>
+            <div class="muted" id="passwordRules" style="line-height:1.8"></div>
+            <div class="right">
+              <button id="savePassword" type="submit">Update password</button>
+            </div>
+            <div class="muted" id="msg"></div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (async function () {
+        const user = await APP.requireAuth();
+        if (!user) return;
+
+        const linksByRole = {
+          admin: [
+            { href: "/admin/dashboard.html", label: "Dashboard" },
+            { href: "/admin/users.html", label: "Users" },
+            { href: "/admin/projects.html", label: "Projects" },
+            { href: "/admin/payments.html", label: "Payments" }
+          ],
+          manager: [
+            { href: "/manager/dashboard.html", label: "Dashboard" },
+            { href: "/manager/review.html", label: "Review" },
+            { href: "/manager/payments.html", label: "Payments" }
+          ],
+          writer: [
+            { href: "/writer/dashboard.html", label: "Dashboard" },
+            { href: "/writer/earnings.html", label: "Earnings" }
+          ]
+        };
+        await renderTopbar({ role: user.role, links: linksByRole[user.role] || [] });
+
+        const profileOut = await APP.apiFetch("/api/profile");
+        const profile = profileOut.profile || {};
+        const firstName = profile.first_name || String(profile.full_name || "").trim().split(/\s+/)[0] || "";
+        document.getElementById("firstName").value = firstName;
+        document.getElementById("email").value = profile.email || "";
+        document.getElementById("role").value = profile.role || "";
+        document.getElementById("uniqueId").value = profile.unique_id || "";
+
+        const currentPassword = document.getElementById("currentPassword");
+        const newPassword = document.getElementById("newPassword");
+        const confirmPassword = document.getElementById("confirmPassword");
+        const rulesEl = document.getElementById("passwordRules");
+        const msgEl = document.getElementById("msg");
+        const saveBtn = document.getElementById("savePassword");
+
+        function passwordProblems(value) {
+          const password = String(value || "");
+          const lower = password.toLowerCase();
+          const emailName = String(profile.email || "").toLowerCase().split("@")[0] || "";
+          const nameParts = String(profile.full_name || "")
+            .toLowerCase()
+            .split(/\s+/)
+            .map((part) => part.trim())
+            .filter((part) => part.length >= 3);
+          const weakTerms = ["password", "qwerty", "welcome", "letmein", "admin", "realwrite"];
+          const checks = [
+            { ok: password.length >= 12, text: "At least 12 characters" },
+            { ok: !/\s/.test(password), text: "No spaces" },
+            { ok: /[a-z]/.test(password), text: "Lowercase letter" },
+            { ok: /[A-Z]/.test(password), text: "Uppercase letter" },
+            { ok: /\d/.test(password), text: "Number" },
+            { ok: /[^A-Za-z0-9]/.test(password), text: "Symbol" },
+            { ok: !emailName || emailName.length < 3 || !lower.includes(emailName), text: "Does not include your email name" },
+            { ok: !nameParts.some((part) => lower.includes(part)), text: "Does not include your name" },
+            { ok: !weakTerms.some((term) => lower.includes(term)), text: "Avoids common password words" }
+          ];
+          return checks;
+        }
+
+        function renderRules() {
+          const checks = passwordProblems(newPassword.value);
+          const mismatch = confirmPassword.value && newPassword.value !== confirmPassword.value;
+          const missingFields = !currentPassword.value || !newPassword.value || !confirmPassword.value;
+          rulesEl.innerHTML = checks
+            .map((check) => `${check.ok ? "<span class='badge b-approved'>OK</span>" : "<span class='badge b-draft'>Need</span>"} ${APP.escapeHtml(check.text)}`)
+            .join("<br />");
+          if (mismatch) rulesEl.innerHTML += "<br /><span class='badge b-rejected'>Need</span> Passwords match";
+          saveBtn.disabled = checks.some((check) => !check.ok) || missingFields || newPassword.value !== confirmPassword.value;
+        }
+
+        currentPassword.addEventListener("input", renderRules);
+        newPassword.addEventListener("input", renderRules);
+        confirmPassword.addEventListener("input", renderRules);
+        renderRules();
+
+        document.getElementById("passwordForm").onsubmit = async (e) => {
+          e.preventDefault();
+          msgEl.textContent = "";
+          renderRules();
+          if (saveBtn.disabled) {
+            msgEl.textContent = "Please complete the password requirements first.";
+            return;
+          }
+          try {
+            await APP.apiFetch("/api/profile/password", {
+              method: "PATCH",
+              body: JSON.stringify({
+                current_password: currentPassword.value,
+                new_password: newPassword.value,
+                confirm_password: confirmPassword.value
+              })
+            });
+            currentPassword.value = "";
+            newPassword.value = "";
+            confirmPassword.value = "";
+            renderRules();
+            msgEl.textContent = "Password updated.";
+          } catch (err) {
+            msgEl.textContent = err.message || String(err);
+          }
+        };
+      })();
+    </script>
+  </body>
+</html>

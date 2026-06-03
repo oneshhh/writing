@@ -14,6 +14,7 @@ const paymentsRoutes = require("./routes/payments");
 const notificationsRoutes = require("./routes/notifications");
 const exportRoutes = require("./routes/export");
 const deployRoutes = require("./routes/deploy");
+const profileRoutes = require("./routes/profile");
 
 const app = express();
 
@@ -75,6 +76,7 @@ app.use("/api/articles", authenticate.required, articlesRoutes);
 app.use("/api/payments", authenticate.required, paymentsRoutes);
 app.use("/api/notifications", authenticate.required, notificationsRoutes);
 app.use("/api/export", authenticate.required, exportRoutes);
+app.use("/api/profile", authenticate.required, profileRoutes);
 app.use("/api/deploy", deployRoutes);
 
 app.use((err, req, res, next) => {

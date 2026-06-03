@@ -32,6 +32,7 @@ async function renderTopbar({ role, links }) {
     icon: l.icon || guessIcon(l.label, l.href)
   }));
   navLinks.push({ href: "/shared/notifications.html", label: "Notifications", icon: "notifications" });
+  navLinks.push({ href: "/profile.html", label: "Profile", icon: "account_circle" });
 
   const pathname = String(window.location.pathname || "");
   const isActive = (href) => {
