@@ -19,6 +19,7 @@
             <thead><tr><th>Title</th><th>Status</th><th>Created by</th><th>Created</th><th></th></tr></thead>
             <tbody id="rows"></tbody>
           </table>
+          <div class="muted" id="msg" style="margin-top: 10px"></div>
         </div>
       </div>
     </div>
@@ -36,17 +37,41 @@
           ]
         });
 
-        APP.ui.tableSkeleton("rows", { rows: 8, cols: 5 });
-        const projects = await APP.apiFetch("/api/projects");
-        document.getElementById("rows").innerHTML = (projects.projects || [])
-          .map((p) => `<tr>
-            <td>${APP.escapeHtml(p.title)}</td>
-            <td class="muted">${APP.escapeHtml(p.status)}</td>
-            <td class="muted">${APP.escapeHtml(p.created_by)}</td>
-            <td class="muted">${APP.escapeHtml(new Date(p.created_at).toLocaleString())}</td>
-            <td class="right"><a href="/admin/project-detail.html?id=${encodeURIComponent(p.id)}"><button class="secondary" type="button">Open</button></a></td>
-          </tr>`)
-          .join("");
+        const msg = (t) => (document.getElementById("msg").textContent = t || "");
+
+        async function refresh() {
+          APP.ui.tableSkeleton("rows", { rows: 8, cols: 5 });
+          const projects = await APP.apiFetch("/api/projects");
+          document.getElementById("rows").innerHTML = (projects.projects || [])
+            .map((p) => `<tr>
+              <td>${APP.escapeHtml(p.title)}</td>
+              <td class="muted">${APP.escapeHtml(p.status)}</td>
+              <td class="muted">${APP.escapeHtml(p.created_by)}</td>
+              <td class="muted">${APP.escapeHtml(new Date(p.created_at).toLocaleString())}</td>
+              <td class="right">
+                <a href="/admin/project-detail.html?id=${encodeURIComponent(p.id)}"><button class="secondary" type="button">Open</button></a>
+                <button class="danger" data-delete="${p.id}" data-title="${APP.escapeHtml(p.title)}" type="button">Delete</button>
+              </td>
+            </tr>`)
+            .join("");
+          for (const b of document.querySelectorAll("button[data-delete]")) {
+            b.onclick = async () => {
+              msg("");
+              const title = b.getAttribute("data-title") || "this project";
+              const ok = confirm(`Delete ${title}? This will remove its writer assignments, articles, and payments.`);
+              if (!ok) return;
+              try {
+                await APP.apiFetch(`/api/projects/${encodeURIComponent(b.getAttribute("data-delete"))}`, { method: "DELETE" });
+                await refresh();
+                msg("Deleted.");
+              } catch (e) {
+                msg(e.message || String(e));
+              }
+            };
+          }
+        }
+
+        await refresh();
       })();
     </script>
   </body>

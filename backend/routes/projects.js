@@ -4,6 +4,29 @@ const { getSupabaseAdmin } = require("../utils/supabase");
 
 const router = express.Router();
 
+async function deleteProjectTree(db, projectId) {
+  const { data: articles, error: articleListErr } = await db.from("articles").select("id").eq("project_id", projectId);
+  if (articleListErr) throw articleListErr;
+
+  const articleIds = (articles || []).map((article) => article.id).filter(Boolean);
+  if (articleIds.length) {
+    const { error: paymentByArticleErr } = await db.from("payments").delete().in("article_id", articleIds);
+    if (paymentByArticleErr) throw paymentByArticleErr;
+  }
+
+  const { error: paymentErr } = await db.from("payments").delete().eq("project_id", projectId);
+  if (paymentErr) throw paymentErr;
+
+  const { error: articleErr } = await db.from("articles").delete().eq("project_id", projectId);
+  if (articleErr) throw articleErr;
+
+  const { error: assignmentErr } = await db.from("project_writers").delete().eq("project_id", projectId);
+  if (assignmentErr) throw assignmentErr;
+
+  const { error: projectErr } = await db.from("projects").delete().eq("id", projectId);
+  if (projectErr) throw projectErr;
+}
+
 router.get("/", async (req, res) => {
   const db = getSupabaseAdmin();
   const user = req.auth.user;
@@ -156,6 +179,24 @@ router.patch("/:id", authorizeRoles("manager"), async (req, res) => {
   const { data, error } = await db.from("projects").update(patch).eq("id", id).select("*").single();
   if (error) return res.status(400).json({ error: error.message });
   return res.json({ project: data });
+});
+
+router.delete("/:id", authorizeRoles("manager", "admin"), async (req, res) => {
+  const { id } = req.params;
+  const db = getSupabaseAdmin();
+
+  const { data: project, error: pErr } = await db.from("projects").select("id,created_by").eq("id", id).single();
+  if (pErr) return res.status(400).json({ error: pErr.message });
+  if (req.auth.user.role === "manager" && project.created_by !== req.auth.user.id) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  try {
+    await deleteProjectTree(db, id);
+    return res.status(204).send();
+  } catch (e) {
+    return res.status(400).json({ error: e.message || "Could not delete project" });
+  }
 });
 
 module.exports = router;

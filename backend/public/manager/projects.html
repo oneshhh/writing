@@ -47,6 +47,8 @@
         if (!user) return;
         await renderTopbar({ role: user.role, links: [{ href: "/manager/dashboard.html", label: "Dashboard" }] });
 
+        const msg = (t) => (document.getElementById("msg").textContent = t || "");
+
         async function refresh() {
           APP.ui.tableSkeleton("rows", { rows: 8, cols: 3 });
           const projects = await APP.apiFetch("/api/projects");
@@ -54,13 +56,30 @@
             .map((p) => `<tr>
               <td>${APP.escapeHtml(p.title)}</td>
               <td class="muted">${APP.escapeHtml(p.status)}</td>
-              <td class="right"><a href="/manager/project-detail.html?id=${encodeURIComponent(p.id)}"><button class="secondary">Open</button></a></td>
+              <td class="right">
+                <a href="/manager/project-detail.html?id=${encodeURIComponent(p.id)}"><button class="secondary">Open</button></a>
+                <button class="danger" data-delete="${p.id}" data-title="${APP.escapeHtml(p.title)}">Delete</button>
+              </td>
             </tr>`)
             .join("");
+          for (const b of document.querySelectorAll("button[data-delete]")) {
+            b.onclick = async () => {
+              msg("");
+              const title = b.getAttribute("data-title") || "this project";
+              const ok = confirm(`Delete ${title}? This will remove its writer assignments, articles, and payments.`);
+              if (!ok) return;
+              try {
+                await APP.apiFetch(`/api/projects/${encodeURIComponent(b.getAttribute("data-delete"))}`, { method: "DELETE" });
+                await refresh();
+                msg("Deleted.");
+              } catch (e) {
+                msg(e.message || String(e));
+              }
+            };
+          }
         }
         await refresh();
 
-        const msg = (t) => (document.getElementById("msg").textContent = t || "");
         document.getElementById("create").onclick = async () => {
           msg("");
           try {

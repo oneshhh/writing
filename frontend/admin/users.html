@@ -79,6 +79,7 @@
               <td>${u.is_active ? "<span class='badge b-approved'>active</span>" : "<span class='badge b-rejected'>inactive</span>"}</td>
               <td class="right">
                 <button class="secondary" data-toggle="${u.id}" data-active="${u.is_active}">${u.is_active ? "Deactivate" : "Activate"}</button>
+                ${u.role === "writer" ? `<button class="danger" data-delete="${u.id}" data-name="${APP.escapeHtml(u.full_name || u.email)}">Delete</button>` : ""}
               </td>
             </tr>`)
             .join("");
@@ -91,6 +92,21 @@
                 await APP.apiFetch(`/api/users/${encodeURIComponent(id)}/status`, { method: "PATCH", body: JSON.stringify({ is_active: next }) });
                 await refresh();
               } catch (e) { msg(e.message || String(e)); }
+            };
+          }
+          for (const b of document.querySelectorAll("button[data-delete]")) {
+            b.onclick = async () => {
+              msg("");
+              const name = b.getAttribute("data-name") || "this writer";
+              const ok = confirm(`Delete ${name}? This will remove their project assignments, articles, and payments.`);
+              if (!ok) return;
+              try {
+                await APP.apiFetch(`/api/users/${encodeURIComponent(b.getAttribute("data-delete"))}`, { method: "DELETE" });
+                await refresh();
+                msg("Deleted.");
+              } catch (e) {
+                msg(e.message || String(e));
+              }
             };
           }
         }

@@ -4,6 +4,32 @@ const { getSupabaseAdmin } = require("../utils/supabase");
 
 const router = express.Router();
 
+async function deleteWriterTree(db, writerId) {
+  const { data: articles, error: articleListErr } = await db.from("articles").select("id").eq("writer_id", writerId);
+  if (articleListErr) throw articleListErr;
+
+  const articleIds = (articles || []).map((article) => article.id).filter(Boolean);
+  if (articleIds.length) {
+    const { error: paymentByArticleErr } = await db.from("payments").delete().in("article_id", articleIds);
+    if (paymentByArticleErr) throw paymentByArticleErr;
+  }
+
+  const { error: paymentErr } = await db.from("payments").delete().eq("writer_id", writerId);
+  if (paymentErr) throw paymentErr;
+
+  const { error: articleErr } = await db.from("articles").delete().eq("writer_id", writerId);
+  if (articleErr) throw articleErr;
+
+  const { error: assignmentErr } = await db.from("project_writers").delete().eq("writer_id", writerId);
+  if (assignmentErr) throw assignmentErr;
+
+  const { error: notificationErr } = await db.from("notifications").delete().eq("user_id", writerId);
+  if (notificationErr) throw notificationErr;
+
+  const { error: userErr } = await db.from("users").delete().eq("id", writerId);
+  if (userErr) throw userErr;
+}
+
 router.get("/writers", authorizeRoles("manager", "admin"), async (req, res) => {
   const db = getSupabaseAdmin();
   const q = String(req.query.q || "").trim();
@@ -83,6 +109,26 @@ router.patch("/:id/status", authorizeRoles("admin"), async (req, res) => {
     .single();
   if (error) return res.status(400).json({ error: error.message });
   return res.json({ user: data });
+});
+
+router.delete("/:id", authorizeRoles("admin"), async (req, res) => {
+  const { id } = req.params;
+  if (id === req.auth.user.id) return res.status(400).json({ error: "You cannot delete your own account." });
+
+  const db = getSupabaseAdmin();
+  const { data: user, error: getErr } = await db.from("users").select("id,role").eq("id", id).single();
+  if (getErr) return res.status(400).json({ error: getErr.message });
+  if (user.role !== "writer") {
+    return res.status(400).json({ error: "Only writer accounts can be deleted here. Deactivate admins/managers instead." });
+  }
+
+  try {
+    await deleteWriterTree(db, id);
+    await db.auth.admin.deleteUser(id);
+    return res.status(204).send();
+  } catch (e) {
+    return res.status(400).json({ error: e.message || "Could not delete user" });
+  }
 });
 
 module.exports = router;
