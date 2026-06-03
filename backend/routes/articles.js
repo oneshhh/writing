@@ -8,6 +8,30 @@ const { createNotification } = require("../services/notifications");
 
 const router = express.Router();
 
+async function nextArticleUniqueId(db, projectId) {
+  const prefix = `ART-${projectId}-`;
+  const { data, error } = await db
+    .from("articles")
+    .select("unique_id")
+    .eq("project_id", projectId)
+    .ilike("unique_id", `${prefix}%`);
+  if (error) throw error;
+
+  const maxSeq = (data || []).reduce((max, row) => {
+    const raw = String(row.unique_id || "");
+    if (!raw.startsWith(prefix)) return max;
+    const seq = Number(raw.slice(prefix.length));
+    return Number.isInteger(seq) && seq > max ? seq : max;
+  }, 0);
+
+  return buildArticleUniqueId(projectId, maxSeq + 1);
+}
+
+function isUniqueConstraintError(error) {
+  const msg = String(error?.message || "");
+  return error?.code === "23505" || msg.includes("articles_unique_id_key") || msg.includes("duplicate key value");
+}
+
 router.get("/", async (req, res) => {
   const db = getSupabaseAdmin();
   const user = req.auth.user;
@@ -246,31 +270,34 @@ router.post("/", authorizeRoles("writer"), async (req, res) => {
   if (aErr) return res.status(400).json({ error: aErr.message });
   if (!assignment) return res.status(403).json({ error: "Writer not assigned to project" });
 
-  const { count, error: cErr } = await db
-    .from("articles")
-    .select("*", { count: "exact", head: true })
-    .eq("project_id", project_id);
-  if (cErr) return res.status(400).json({ error: cErr.message });
-  const unique_id = buildArticleUniqueId(project_id, (count || 0) + 1);
+  const articlePayload = {
+    project_id,
+    writer_id: req.auth.user.id,
+    title,
+    short_description: short_description || null,
+    long_description: long_description || null,
+    article_type: article_type || "other",
+    seo_tags: Array.isArray(seo_tags) ? seo_tags : null
+  };
 
-  const { data, error } = await db
-    .from("articles")
-    .insert([
-      {
-        unique_id,
-        project_id,
-        writer_id: req.auth.user.id,
-        title,
-        short_description: short_description || null,
-        long_description: long_description || null,
-        article_type: article_type || "other",
-        seo_tags: Array.isArray(seo_tags) ? seo_tags : null
-      }
-    ])
-    .select("*")
-    .single();
-  if (error) return res.status(400).json({ error: error.message });
-  return res.json({ article: data });
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    let unique_id;
+    try {
+      unique_id = await nextArticleUniqueId(db, project_id);
+    } catch (e) {
+      return res.status(400).json({ error: e.message });
+    }
+
+    const { data, error } = await db
+      .from("articles")
+      .insert([{ ...articlePayload, unique_id }])
+      .select("*")
+      .single();
+    if (!error) return res.json({ article: data });
+    if (!isUniqueConstraintError(error) || attempt === 2) return res.status(400).json({ error: error.message });
+  }
+
+  return res.status(409).json({ error: "Could not generate a unique article id. Please try again." });
 });
 
 router.patch("/:id", authorizeRoles("writer"), async (req, res) => {
