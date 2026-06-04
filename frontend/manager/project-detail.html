@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/png" href="/assets/realwrite-logo.png" />
     <link rel="apple-touch-icon" href="/assets/realwrite-logo.png" />
-    <title>Real Write • Manager • Project</title>
+    <title>Real Write - Manager - Project</title>
     <link rel="stylesheet" href="/assets/styles.css" />
     <script src="/shared/config.js"></script>
     <script src="/shared/app.js"></script>
@@ -13,8 +13,20 @@
   </head>
   <body>
     <div class="topbar" id="topbar"></div>
-    <div class="wrap">
+    <div class="wrap wide">
       <div class="grid">
+        <div class="card">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+            <div>
+              <h3 id="projectHeading">Project</h3>
+              <div class="muted" id="projectMeta" style="margin-top:6px"></div>
+            </div>
+            <div class="right" style="flex-wrap:wrap;">
+              <a href="/manager/projects.html"><button class="secondary" type="button">Back</button></a>
+            </div>
+          </div>
+        </div>
+
         <div class="card" style="grid-column: span 5">
           <h2>Project Settings</h2>
           <div>
@@ -34,8 +46,7 @@
           </div>
 
           <div style="margin-top: 18px; border-top: 1px solid rgba(229,226,225,0.9); padding-top: 14px">
-            <h2 style="margin-bottom: 8px">Writers</h2>
-            <div class="muted">Search writers by name or email, then assign with a price.</div>
+            <h2 style="margin-bottom: 8px">Add Writers</h2>
             <div style="margin-top: 10px">
               <label class="muted">Search</label>
               <input id="writerSearch" placeholder="type a name or email..." />
@@ -65,6 +76,48 @@
             <thead><tr><th>Writer</th><th>Price</th><th>Assigned</th><th></th></tr></thead>
             <tbody id="rows"></tbody>
           </table>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+            <div>
+              <h2 style="margin-bottom: 6px">Monthly Articles</h2>
+              <div class="muted" id="monthHint"></div>
+            </div>
+            <div class="right" style="flex-wrap:wrap;">
+              <button class="secondary" id="prevMonth" type="button">Previous month</button>
+              <select id="monthSelect" style="width:auto;min-width:170px"></select>
+              <button class="secondary" id="nextMonth" type="button">Next month</button>
+            </div>
+          </div>
+
+          <div class="row" style="margin-top: 14px">
+            <div class="stat">
+              <div class="pill dot green">Approved</div>
+              <div class="n" id="nApproved">0</div>
+            </div>
+            <div class="stat">
+              <div class="pill dot red">Rejected</div>
+              <div class="n" id="nRejected">0</div>
+            </div>
+            <div class="stat">
+              <div class="pill dot amber">Rework</div>
+              <div class="n" id="nRework">0</div>
+            </div>
+            <div class="stat">
+              <div class="pill dot blue">Submitted</div>
+              <div class="n" id="nSubmitted">0</div>
+            </div>
+          </div>
+
+          <div style="margin-top: 16px; overflow:auto;">
+            <table>
+              <thead>
+                <tr><th>#</th><th>Article</th><th>Writer</th><th>Status</th><th>Submitted</th><th>Reviewed</th></tr>
+              </thead>
+              <tbody id="articleRows"></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
@@ -98,7 +151,9 @@
           role: user.role,
           links: [
             { href: "/manager/dashboard.html", label: "Dashboard" },
-            { href: "/manager/projects.html", label: "Projects" }
+            { href: "/manager/projects.html", label: "Projects" },
+            { href: "/manager/review.html", label: "Review" },
+            { href: "/manager/payments.html", label: "Payments" }
           ]
         });
 
@@ -110,25 +165,58 @@
         }
 
         const msg = (t) => (document.getElementById("msg").textContent = t || "");
+        const monthSelect = document.getElementById("monthSelect");
+        let project = null;
+        let allWriters = [];
+        let activeMonth = currentMonthKey();
+        let availableMonths = [];
+
+        function pad2(n) {
+          return String(n).padStart(2, "0");
+        }
+
+        function currentMonthKey() {
+          const d = new Date();
+          return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+        }
+
+        function shiftMonth(month, delta) {
+          const [year, monthNum] = month.split("-").map(Number);
+          const d = new Date(Date.UTC(year, monthNum - 1 + delta, 1));
+          return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}`;
+        }
+
+        function monthLabel(month) {
+          const [year, monthNum] = month.split("-").map(Number);
+          return new Date(Date.UTC(year, monthNum - 1, 1)).toLocaleString(undefined, {
+            month: "long",
+            year: "numeric",
+            timeZone: "UTC"
+          });
+        }
 
         async function loadProject() {
           const projects = await APP.apiFetch("/api/projects");
-          const project = (projects.projects || []).find((p) => p.id === id);
+          project = (projects.projects || []).find((p) => p.id === id);
           if (!project) throw new Error("Project not found.");
+          document.getElementById("projectHeading").textContent = project.title || "Project";
+          document.getElementById("projectMeta").textContent = `${project.status || "active"} - ${project.created_at ? new Date(project.created_at).toLocaleString() : ""}`;
           document.getElementById("pTitle").value = project.title || "";
           document.getElementById("pDesc").value = project.description || "";
           document.getElementById("pAi").checked = !!project.ai_check_enabled;
           document.getElementById("pPlag").checked = !!project.plagiarism_check_enabled;
+          document.title = `MANAGER - Project - ${project.title || ""}`;
         }
 
         async function refreshAssigned() {
-          APP.ui.tableSkeleton("rows", { rows: 6, cols: 3 });
+          APP.ui.tableSkeleton("rows", { rows: 6, cols: 4 });
           const writers = await APP.apiFetch(`/api/projects/${encodeURIComponent(id)}/writers`);
           const assigned = writers.writers || [];
           window.__assignedWriters = new Map(assigned.map((w) => [w.writer_id, w]));
-          document.getElementById("rows").innerHTML = assigned
-            .map(
-              (w) => `<tr>
+          document.getElementById("rows").innerHTML = assigned.length
+            ? assigned
+                .map(
+                  (w) => `<tr>
               <td>${APP.escapeHtml(w.users?.full_name || "Writer")}<div class="muted">${APP.escapeHtml(w.users?.email || "")}</div></td>
               <td>&#8377;${APP.escapeHtml(w.price_per_article)}</td>
               <td class="muted">${APP.escapeHtml(new Date(w.assigned_at).toLocaleString())}</td>
@@ -137,8 +225,9 @@
                 <button class="danger" data-remove="${w.writer_id}" style="margin-left:8px">Remove</button>
               </td>
             </tr>`
-            )
-            .join("");
+                )
+                .join("")
+            : "<tr><td colspan='4' class='muted'>No writers assigned.</td></tr>";
 
           for (const b of document.querySelectorAll("button[data-edit]")) {
             b.onclick = async () => {
@@ -146,7 +235,7 @@
               const row = window.__assignedWriters.get(writerId);
               await openPriceDialog({
                 title: "Edit writer price",
-                sub: `${row?.users?.full_name || "Writer"} • ${row?.users?.email || ""}`,
+                sub: `${row?.users?.full_name || "Writer"} - ${row?.users?.email || ""}`,
                 price: Number(row?.price_per_article || 0),
                 onSave: async (price) => {
                   await APP.apiFetch(`/api/projects/${encodeURIComponent(id)}/writers/${encodeURIComponent(writerId)}`, {
@@ -168,9 +257,7 @@
               if (!ok) return;
               msg("");
               try {
-                await APP.apiFetch(`/api/projects/${encodeURIComponent(id)}/writers/${encodeURIComponent(writerId)}`, {
-                  method: "DELETE"
-                });
+                await APP.apiFetch(`/api/projects/${encodeURIComponent(id)}/writers/${encodeURIComponent(writerId)}`, { method: "DELETE" });
                 await refreshAssigned();
                 renderWriterRows();
                 msg("Removed.");
@@ -181,7 +268,6 @@
           }
         }
 
-        let allWriters = [];
         async function loadWriters(q) {
           const mini = document.getElementById("writerMiniLoad");
           if (mini) mini.classList.remove("hidden");
@@ -192,12 +278,11 @@
         }
 
         function renderWriterRows() {
-          const filtered = allWriters;
           const assignedMap = window.__assignedWriters || new Map();
-
-          document.getElementById("writerRows").innerHTML = filtered
-            .map(
-              (u) => `<tr>
+          document.getElementById("writerRows").innerHTML = allWriters.length
+            ? allWriters
+                .map(
+                  (u) => `<tr>
               <td>${APP.escapeHtml(u.full_name || "")}<div class="muted">${APP.escapeHtml(u.email || "")}</div></td>
               <td class="right">
                 ${
@@ -207,8 +292,9 @@
                 }
               </td>
             </tr>`
-            )
-            .join("");
+                )
+                .join("")
+            : "<tr><td colspan='2' class='muted'>No writers found.</td></tr>";
 
           for (const b of document.querySelectorAll("button[data-assign]")) {
             b.onclick = async () => {
@@ -218,7 +304,7 @@
                 const u = allWriters.find((x) => x.id === writerId);
                 await openPriceDialog({
                   title: "Assign writer",
-                  sub: `${u?.full_name || "Writer"} • ${u?.email || ""}`,
+                  sub: `${u?.full_name || "Writer"} - ${u?.email || ""}`,
                   price: 0,
                   onSave: async (price) => {
                     await APP.apiFetch(`/api/projects/${encodeURIComponent(id)}/writers`, {
@@ -235,6 +321,62 @@
               }
             };
           }
+        }
+
+        function syncMonthSelect() {
+          const months = Array.from(new Set([activeMonth, ...availableMonths])).sort((a, b) => b.localeCompare(a));
+          monthSelect.innerHTML = months.map((m) => `<option value="${m}">${APP.escapeHtml(monthLabel(m))}</option>`).join("");
+          monthSelect.value = activeMonth;
+          const earliest = availableMonths.length ? availableMonths[availableMonths.length - 1] : activeMonth;
+          document.getElementById("prevMonth").disabled = availableMonths.length === 0 || activeMonth <= earliest;
+          document.getElementById("nextMonth").disabled = activeMonth >= currentMonthKey();
+          document.getElementById("monthHint").textContent = `${monthLabel(activeMonth)} - writer numbers reset each month`;
+        }
+
+        function renderStats(stats) {
+          document.getElementById("nApproved").textContent = String(stats.approved || 0);
+          document.getElementById("nRejected").textContent = String(stats.rejected || 0);
+          document.getElementById("nRework").textContent = String(stats.rework || 0);
+          document.getElementById("nSubmitted").textContent = String(stats.submitted || 0);
+        }
+
+        function renderArticles(articles) {
+          document.getElementById("articleRows").innerHTML = articles.length
+            ? articles
+                .map((a, idx) => {
+                  const writerName = a.writer?.full_name || "Writer";
+                  const reviewed = a.reviewed_at ? new Date(a.reviewed_at).toLocaleString() : "-";
+                  return `<tr>
+                <td><span class="pill" style="font-weight:800;">${idx + 1}</span></td>
+                <td>
+                  <div style="font-weight:800">${APP.escapeHtml(a.title || "")}</div>
+                  <div class="muted">${APP.escapeHtml(a.unique_id || a.id)}</div>
+                </td>
+                <td>
+                  <div style="font-weight:750">${APP.escapeHtml(writerName)} (${APP.escapeHtml(a.writer_month_number)})</div>
+                  <div class="muted">${APP.escapeHtml(a.writer?.email || "")}</div>
+                </td>
+                <td>${APP.badgeForStatus(a.status)}</td>
+                <td class="muted">${APP.escapeHtml(new Date(a.submitted_at || a.created_at).toLocaleString())}</td>
+                <td class="muted">${APP.escapeHtml(reviewed)}</td>
+              </tr>`;
+                })
+                .join("")
+            : `<tr><td colspan="6" class="muted">No submitted articles for ${APP.escapeHtml(monthLabel(activeMonth))}.</td></tr>`;
+        }
+
+        async function loadArticleMonth() {
+          APP.ui.textSkeleton("nApproved", { kind: "num", width: "54%" });
+          APP.ui.textSkeleton("nRejected", { kind: "num", width: "54%" });
+          APP.ui.textSkeleton("nRework", { kind: "num", width: "54%" });
+          APP.ui.textSkeleton("nSubmitted", { kind: "num", width: "54%" });
+          APP.ui.tableSkeleton("articleRows", { rows: 6, cols: 6 });
+
+          const out = await APP.apiFetch(`/api/articles/project/${encodeURIComponent(id)}/month?month=${encodeURIComponent(activeMonth)}`);
+          availableMonths = out.available_months || [];
+          renderStats(out.stats || {});
+          syncMonthSelect();
+          renderArticles(out.articles || []);
         }
 
         async function openPriceDialog({ title, sub, price, onSave }) {
@@ -255,7 +397,6 @@
               dlg.removeEventListener("close", onClose);
               okBtn.onclick = null;
               if (dlg.returnValue !== "ok") return resolve(false);
-
               const v = Number(p.value);
               if (!Number.isFinite(v) || v < 0) {
                 m.textContent = "Please enter a valid non-negative price.";
@@ -263,7 +404,6 @@
                 dlg.addEventListener("close", onClose);
                 return;
               }
-
               try {
                 okBtn.disabled = true;
                 await onSave(v);
@@ -287,12 +427,7 @@
             try {
               await loadWriters(q);
             } catch (e) {
-              const m = String(e?.message || e || "");
-              if (m.includes("(404)")) {
-                msg("Writers API not found (404). Restart the backend server so it loads the latest routes.");
-              } else {
-                msg(m);
-              }
+              msg(e.message || String(e));
               const mini = document.getElementById("writerMiniLoad");
               if (mini) mini.classList.add("hidden");
             }
@@ -319,11 +454,26 @@
           }
         };
 
+        document.getElementById("prevMonth").onclick = async () => {
+          activeMonth = shiftMonth(activeMonth, -1);
+          await loadArticleMonth();
+        };
+        document.getElementById("nextMonth").onclick = async () => {
+          activeMonth = shiftMonth(activeMonth, 1);
+          await loadArticleMonth();
+        };
+        monthSelect.onchange = async () => {
+          activeMonth = monthSelect.value;
+          await loadArticleMonth();
+        };
+
         try {
           msg("");
+          syncMonthSelect();
           await loadProject();
           await refreshAssigned();
           await loadWriters("");
+          await loadArticleMonth();
         } catch (e) {
           msg(e.message || String(e));
         }

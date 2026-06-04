@@ -32,6 +32,29 @@ function isUniqueConstraintError(error) {
   return error?.code === "23505" || msg.includes("articles_unique_id_key") || msg.includes("duplicate key value");
 }
 
+function monthRange(month) {
+  const raw = String(month || "").trim();
+  const match = raw.match(/^(\d{4})-(\d{2})$/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const monthIndex = Number(match[2]) - 1;
+  if (!Number.isInteger(year) || !Number.isInteger(monthIndex) || monthIndex < 0 || monthIndex > 11) return null;
+  const start = new Date(Date.UTC(year, monthIndex, 1, 0, 0, 0));
+  const end = new Date(Date.UTC(year, monthIndex + 1, 1, 0, 0, 0));
+  return { startIso: start.toISOString(), endIso: end.toISOString() };
+}
+
+async function ensureProjectAccess(db, projectId, user) {
+  const { data: project, error } = await db.from("projects").select("*").eq("id", projectId).single();
+  if (error) throw error;
+  if (user.role === "manager" && project.created_by !== user.id) {
+    const forbidden = new Error("Forbidden");
+    forbidden.status = 403;
+    throw forbidden;
+  }
+  return project;
+}
+
 router.get("/", async (req, res) => {
   const db = getSupabaseAdmin();
   const user = req.auth.user;
@@ -161,6 +184,68 @@ router.get("/stats/monthly", authorizeRoles("writer", "manager", "admin"), async
   if (error) return res.status(400).json({ error: error.message });
   await applyRows(data);
   return res.json({ months: keys.map((k) => ({ month: k, count: counts[k] })) });
+});
+
+router.get("/project/:projectId/month", authorizeRoles("manager", "admin"), async (req, res) => {
+  const { projectId } = req.params;
+  const range = monthRange(req.query.month);
+  if (!range) return res.status(400).json({ error: "month must be in YYYY-MM format" });
+
+  const db = getSupabaseAdmin();
+  let project;
+  try {
+    project = await ensureProjectAccess(db, projectId, req.auth.user);
+  } catch (e) {
+    return res.status(e.status || 400).json({ error: e.message || "Project not found" });
+  }
+
+  const { data: monthRows, error } = await db
+    .from("articles")
+    .select("id,unique_id,project_id,writer_id,title,status,created_at,updated_at,submitted_at,reviewed_at,manager_note")
+    .eq("project_id", projectId)
+    .gte("submitted_at", range.startIso)
+    .lt("submitted_at", range.endIso)
+    .order("submitted_at", { ascending: true, nullsFirst: false });
+  if (error) return res.status(400).json({ error: error.message });
+
+  const { data: allSubmitted, error: monthsErr } = await db
+    .from("articles")
+    .select("submitted_at")
+    .eq("project_id", projectId)
+    .not("submitted_at", "is", null)
+    .order("submitted_at", { ascending: false });
+  if (monthsErr) return res.status(400).json({ error: monthsErr.message });
+
+  const writerIds = Array.from(new Set((monthRows || []).map((a) => a.writer_id).filter(Boolean)));
+  let usersById = new Map();
+  if (writerIds.length) {
+    const { data: users, error: usersErr } = await db
+      .from("users")
+      .select("id,full_name,email,unique_id")
+      .in("id", writerIds);
+    if (usersErr) return res.status(400).json({ error: usersErr.message });
+    usersById = new Map((users || []).map((u) => [u.id, u]));
+  }
+
+  const stats = { approved: 0, rejected: 0, rework: 0, submitted: 0, total: 0 };
+  const writerCounts = new Map();
+  const articles = (monthRows || []).map((article) => {
+    stats.total += 1;
+    if (stats[article.status] !== undefined) stats[article.status] += 1;
+    const writerNumber = (writerCounts.get(article.writer_id) || 0) + 1;
+    writerCounts.set(article.writer_id, writerNumber);
+    return {
+      ...article,
+      writer: usersById.get(article.writer_id) || null,
+      writer_month_number: writerNumber
+    };
+  });
+
+  const availableMonths = Array.from(
+    new Set((allSubmitted || []).map((row) => String(row.submitted_at || "").slice(0, 7)).filter(Boolean))
+  ).sort((a, b) => b.localeCompare(a));
+
+  return res.json({ project, month: String(req.query.month), stats, articles, available_months: availableMonths });
 });
 
 router.get("/admin/list", authorizeRoles("admin"), async (req, res) => {
