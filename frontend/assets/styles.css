@@ -770,8 +770,7 @@ button.danger {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(252, 249, 248, 0.55);
-  backdrop-filter: blur(10px);
+  background: rgba(252, 249, 248, 0.28);
   z-index: 200;
   opacity: 0;
   pointer-events: none;

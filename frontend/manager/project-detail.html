@@ -481,10 +481,8 @@
         try {
           msg("");
           syncMonthSelect();
-          await loadProject();
-          await refreshAssigned();
+          await Promise.all([loadProject(), refreshAssigned(), loadArticleMonth()]);
           await loadWriters("");
-          await loadArticleMonth();
         } catch (e) {
           msg(e.message || String(e));
         }

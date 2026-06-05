@@ -1,7 +1,7 @@
 /* global APP_CONFIG */
 
-const DEFAULT_LOADER_DELAY_MS = 450;
-const ACTION_RESULT_VISIBLE_MS = 280;
+const DEFAULT_LOADER_DELAY_MS = 900;
+const ACTION_RESULT_VISIBLE_MS = 160;
 
 function getLoaderState() {
   if (!window.__rwLoaderState) {
@@ -27,7 +27,6 @@ function ensureLoader() {
       </div>
       <div>
         <div id="rwLoaderTitle" style="font-weight:750;color:var(--rw-text);font-size:13px;">Loading</div>
-        <div id="rwLoaderSub" style="margin-top:2px;color:var(--rw-muted);font-size:12px;">Fetching the latest updates...</div>
       </div>
     </div>
   `;
@@ -92,9 +91,7 @@ function beginLoading(label, { sub, delayMs = DEFAULT_LOADER_DELAY_MS } = {}) {
   ensureLoader();
 
   const titleEl = document.getElementById("rwLoaderTitle");
-  const subEl = document.getElementById("rwLoaderSub");
   if (titleEl) titleEl.textContent = String(label || "Loading");
-  if (subEl) subEl.textContent = String(sub || "Fetching the latest updates...");
 
   const spinner = document.getElementById("rwLoaderSpinner");
   const symbol = document.getElementById("rwLoaderSymbol");
@@ -178,17 +175,16 @@ async function runActionOverlay({ title, sub, successSymbol = "check_circle", er
 
 async function apiFetch(path, options) {
   const { skipLoader, loaderDelayMs = DEFAULT_LOADER_DELAY_MS, ...fetchOptions } = options || {};
-  const useLoader = !skipLoader;
-  if (useLoader) beginLoading("Loading", { delayMs: loaderDelayMs });
+  const method = String(fetchOptions.method || "GET").toUpperCase();
+  const useLoader = !skipLoader && method !== "GET";
+  if (useLoader) beginLoading("Working", { delayMs: loaderDelayMs });
   try {
     const headers = new Headers((fetchOptions && fetchOptions.headers) || {});
     const isForm = typeof FormData !== "undefined" && fetchOptions?.body instanceof FormData;
     if (!isForm) headers.set("Content-Type", headers.get("Content-Type") || "application/json");
-    headers.set("Cache-Control", headers.get("Cache-Control") || "no-cache");
-    headers.set("Pragma", headers.get("Pragma") || "no-cache");
 
     const url = `${APP_CONFIG.apiBaseUrl}${path}`;
-    const fetchOpts = { ...(fetchOptions || {}), headers, cache: "no-store", credentials: "include" };
+    const fetchOpts = { ...(fetchOptions || {}), headers, credentials: "include" };
     let res;
     try {
       res = await fetch(url, fetchOpts);

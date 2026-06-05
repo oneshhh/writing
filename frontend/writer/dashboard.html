@@ -83,17 +83,10 @@
         APP.ui.tableSkeleton("rows", { rows: 8, cols: 9 });
         APP.ui.textSkeleton("pageInfo", { kind: "line", width: "120px" });
 
-        const stats = await APP.apiFetch("/api/articles/stats/me");
-        APP.setText("nApproved", stats.counts.approved || 0);
-        APP.setText("nRejected", stats.counts.rejected || 0);
-        APP.setText("nRework", stats.counts.rework || 0);
-
-        const projects = await APP.apiFetch("/api/projects");
-        const projectName = new Map((projects.projects || []).map((p) => [p.id, p.title]));
-
         const pageSize = 20;
         let offset = 0;
         let total = null;
+        let projectName = new Map();
 
         function renderRows(rows) {
           document.getElementById("rows").innerHTML = (rows || [])
@@ -141,7 +134,18 @@
           await loadPage();
         };
 
-        await loadPage();
+        const [stats, projects, list] = await Promise.all([
+          APP.apiFetch("/api/articles/stats/me"),
+          APP.apiFetch("/api/projects"),
+          APP.apiFetch(`/api/articles?limit=${pageSize}&offset=${offset}`)
+        ]);
+        APP.setText("nApproved", stats.counts.approved || 0);
+        APP.setText("nRejected", stats.counts.rejected || 0);
+        APP.setText("nRework", stats.counts.rework || 0);
+        projectName = new Map((projects.projects || []).map((p) => [p.id, p.title]));
+        total = list.total ?? total;
+        renderRows(list.articles || []);
+        updatePager();
       })();
     </script>
   </body>
