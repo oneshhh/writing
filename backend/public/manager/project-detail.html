@@ -346,10 +346,11 @@
                 .map((a, idx) => {
                   const writerName = a.writer?.full_name || "Writer";
                   const reviewed = a.reviewed_at ? new Date(a.reviewed_at).toLocaleString() : "-";
-                  return `<tr>
+                  const reviewUrl = `/manager/review.html?id=${encodeURIComponent(a.id)}`;
+                  return `<tr data-review-url="${reviewUrl}" tabindex="0" style="cursor:pointer;">
                 <td><span class="pill" style="font-weight:800;">${idx + 1}</span></td>
                 <td>
-                  <div style="font-weight:800">${APP.escapeHtml(a.title || "")}</div>
+                  <a href="${reviewUrl}" style="display:block;color:inherit;text-decoration:none;font-weight:800;">${APP.escapeHtml(a.title || "")}</a>
                   <div class="muted">${APP.escapeHtml(a.unique_id || a.id)}</div>
                 </td>
                 <td>
@@ -363,6 +364,16 @@
                 })
                 .join("")
             : `<tr><td colspan="6" class="muted">No submitted articles for ${APP.escapeHtml(monthLabel(activeMonth))}.</td></tr>`;
+
+          for (const row of document.querySelectorAll("tr[data-review-url]")) {
+            row.onclick = (e) => {
+              if (e.target.closest("a")) return;
+              window.location.href = row.getAttribute("data-review-url");
+            };
+            row.onkeydown = (e) => {
+              if (e.key === "Enter") window.location.href = row.getAttribute("data-review-url");
+            };
+          }
         }
 
         async function loadArticleMonth() {
