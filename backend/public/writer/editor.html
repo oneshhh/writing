@@ -42,7 +42,11 @@
           <div style="margin-top: 10px">
             <label class="muted">Long description</label>
             <div id="editor"></div>
-            <div class="muted" style="margin-top:6px; display:flex; justify-content:flex-end;">
+            <div class="muted editor-meter-row">
+              <span class="autosave-status is-idle" id="autosaveStatus" aria-live="polite">
+                <span class="material-symbols-outlined autosave-icon" id="autosaveIcon" aria-hidden="true">cloud_done</span>
+                <span id="autosaveText">Saved</span>
+              </span>
               <span id="longWords">0 words</span>
             </div>
           </div>
@@ -87,8 +91,19 @@
           clipboard: { matchVisual: false },
           history: { delay: 900, maxStack: 120, userOnly: true }
         });
+        quill.enable(false);
 
         const msg = (t) => (document.getElementById("msg").textContent = t || "");
+        const AUTOSAVE_DELAY_MS = 3000;
+        const autosaveStatus = document.getElementById("autosaveStatus");
+        const autosaveIcon = document.getElementById("autosaveIcon");
+        const autosaveText = document.getElementById("autosaveText");
+        let autosaveTimer = null;
+        let autosaveInFlight = false;
+        let autosaveQueued = false;
+        let autosavePromise = Promise.resolve();
+        let autosaveReady = false;
+        let lastSavedSnapshot = "";
 
         const countWords = (text) => {
           const t = String(text || "").replace(/\s+/g, " ").trim();
@@ -106,6 +121,105 @@
           const n = countWords(quill.getText());
           document.getElementById("longWords").textContent = `${n} word${n === 1 ? "" : "s"}`;
         };
+
+        const getDraftPayload = () => ({
+          title: document.getElementById("title").value.trim(),
+          short_description: document.getElementById("short").value,
+          long_description: quill.root.innerHTML,
+          seo_tags: document.getElementById("tags").value
+            .split(",")
+            .map((t) => t.trim())
+            .filter(Boolean)
+        });
+
+        const getDraftSnapshot = () => JSON.stringify(getDraftPayload());
+
+        const setAutosaveState = (state, text) => {
+          const iconByState = {
+            idle: "cloud_done",
+            unsaved: "cloud_queue",
+            saving: "cloud_sync",
+            saved: "cloud_done",
+            error: "cloud_off"
+          };
+          autosaveStatus.className = `autosave-status ${state === "idle" ? "is-idle" : state}`;
+          autosaveIcon.textContent = iconByState[state] || "cloud_done";
+          autosaveText.textContent = text || {
+            idle: "Saved",
+            unsaved: "Autosave pending",
+            saving: "Saving...",
+            saved: "Saved",
+            error: "Autosave failed"
+          }[state] || "Saved";
+        };
+
+        const scheduleAutosave = () => {
+          if (!autosaveReady) return;
+          clearTimeout(autosaveTimer);
+          if (getDraftSnapshot() === lastSavedSnapshot) {
+            setAutosaveState("saved");
+            return;
+          }
+          setAutosaveState("unsaved");
+          autosaveTimer = setTimeout(() => autosave(), AUTOSAVE_DELAY_MS);
+        };
+
+        async function persistDraft({ skipLoader = false } = {}) {
+          const body = getDraftPayload();
+          const snapshot = JSON.stringify(body);
+          const updated = await APP.apiFetch(`/api/articles/${encodeURIComponent(id)}`, {
+            method: "PATCH",
+            body: JSON.stringify(body),
+            skipLoader
+          });
+          lastSavedSnapshot = snapshot;
+          document.getElementById("statusBadge").innerHTML = APP.badgeForStatus(updated.article.status);
+          setAutosaveState("saved");
+          return updated;
+        }
+
+        async function autosave() {
+          if (!autosaveReady) return;
+          const snapshot = getDraftSnapshot();
+          if (snapshot === lastSavedSnapshot) {
+            setAutosaveState("saved");
+            return;
+          }
+          if (autosaveInFlight) {
+            autosaveQueued = true;
+            return;
+          }
+
+          autosaveInFlight = true;
+          autosaveQueued = false;
+          setAutosaveState("saving");
+          let autosaveFailed = false;
+
+          try {
+            autosavePromise = persistDraft({ skipLoader: true });
+            await autosavePromise;
+          } catch (e) {
+            autosaveFailed = true;
+            setAutosaveState("error");
+          } finally {
+            autosaveInFlight = false;
+            if (autosaveQueued || getDraftSnapshot() !== lastSavedSnapshot) {
+              if (autosaveFailed) {
+                clearTimeout(autosaveTimer);
+                autosaveTimer = setTimeout(() => autosave(), AUTOSAVE_DELAY_MS);
+              } else {
+                scheduleAutosave();
+              }
+            }
+          }
+        }
+
+        async function waitForAutosaveIdle() {
+          clearTimeout(autosaveTimer);
+          if (autosaveInFlight) {
+            try { await autosavePromise; } catch (e) {}
+          }
+        }
 
         APP.ui.textSkeleton("statusBadge", { kind: "line", width: "80px" });
         document.getElementById("title").disabled = true;
@@ -132,40 +246,45 @@
 
         renderShortCount();
         renderLongCount();
-        document.getElementById("short").addEventListener("input", renderShortCount);
-        quill.on("text-change", renderLongCount);
 
         const canEdit = article.status === "draft" || article.status === "rework";
         if (!canEdit) {
           document.getElementById("save").disabled = true;
           document.getElementById("submit").disabled = true;
           msg("This article is read-only in its current status.");
+          setAutosaveState("idle");
         } else {
           document.getElementById("title").disabled = false;
           document.getElementById("tags").disabled = false;
           document.getElementById("short").disabled = false;
           document.getElementById("save").disabled = false;
           document.getElementById("submit").disabled = false;
+          quill.enable(true);
+          lastSavedSnapshot = getDraftSnapshot();
+          autosaveReady = true;
+          setAutosaveState("saved");
         }
 
-        async function save() {
-          const tags = document.getElementById("tags").value
-            .split(",")
-            .map((t) => t.trim())
-            .filter(Boolean);
-          const body = {
-            title: document.getElementById("title").value.trim(),
-            short_description: document.getElementById("short").value,
-            long_description: quill.root.innerHTML,
-            seo_tags: tags
-          };
-          const updated = await APP.apiFetch(`/api/articles/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(body) });
-          document.getElementById("statusBadge").innerHTML = APP.badgeForStatus(updated.article.status);
-        }
+        document.getElementById("title").addEventListener("input", scheduleAutosave);
+        document.getElementById("tags").addEventListener("input", scheduleAutosave);
+        document.getElementById("short").addEventListener("input", () => {
+          renderShortCount();
+          scheduleAutosave();
+        });
+        quill.on("text-change", (_delta, _oldDelta, source) => {
+          renderLongCount();
+          if (source === "user") scheduleAutosave();
+        });
 
         document.getElementById("save").onclick = async () => {
           msg("");
-          try { await save(); msg("Saved."); } catch (e) { msg(e.message || String(e)); }
+          try {
+            await waitForAutosaveIdle();
+            await persistDraft();
+            msg("Saved.");
+          } catch (e) {
+            msg(e.message || String(e));
+          }
         };
         document.getElementById("submit").onclick = async () => {
           msg("");
@@ -176,8 +295,9 @@
               successSymbol: "check_circle",
               errorSymbol: "error",
               action: async () => {
-                await save();
-                return APP.apiFetch(`/api/articles/${encodeURIComponent(id)}/submit`, { method: "POST" });
+                await waitForAutosaveIdle();
+                await persistDraft({ skipLoader: true });
+                return APP.apiFetch(`/api/articles/${encodeURIComponent(id)}/submit`, { method: "POST", skipLoader: true });
               }
             });
             msg("Submitted to manager.");

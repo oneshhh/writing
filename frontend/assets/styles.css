@@ -965,6 +965,78 @@ button.danger {
   min-height: 560px;
 }
 
+.editor-meter-row {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.autosave-status {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--rw-muted-2);
+  font-size: 12px;
+  font-weight: 650;
+  transition: color 0.18s ease, opacity 0.18s ease;
+}
+
+.autosave-status.is-idle {
+  opacity: 0;
+}
+
+.autosave-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.autosave-status.saving {
+  color: var(--rw-accent);
+}
+
+.autosave-status.saving .autosave-icon {
+  animation: autosavePulse 1s ease-in-out infinite;
+}
+
+.autosave-status.saved {
+  color: var(--rw-ok);
+}
+
+.autosave-status.saved .autosave-icon {
+  animation: autosaveDone 0.38s ease;
+}
+
+.autosave-status.error {
+  color: var(--rw-danger);
+}
+
+@keyframes autosavePulse {
+  0%, 100% {
+    transform: translateY(0);
+    opacity: 0.74;
+  }
+  50% {
+    transform: translateY(-1px);
+    opacity: 1;
+  }
+}
+
+@keyframes autosaveDone {
+  0% {
+    transform: scale(0.86);
+  }
+  70% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 .ql-editor {
   font-family: "Geist", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
   color: var(--rw-text);

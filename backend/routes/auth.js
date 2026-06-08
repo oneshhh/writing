@@ -9,10 +9,41 @@ const router = express.Router();
 const COOKIE_ACCESS = "rw_at";
 const COOKIE_REFRESH = "rw_rt";
 const SESSION_MAX_AGE_MS = Number(process.env.SESSION_MAX_AGE_MS || 7 * 24 * 60 * 60 * 1000);
+const USER_ID_PREFIX_BY_ROLE = { admin: "ADM", manager: "MGR", writer: "WRT" };
 
 function cookieOpts() {
   const secure = String(process.env.NODE_ENV || "development") === "production";
   return { httpOnly: true, secure, sameSite: "Lax", path: "/", maxAgeMs: SESSION_MAX_AGE_MS };
+}
+
+async function nextUserUniqueId(db, role) {
+  const prefix = USER_ID_PREFIX_BY_ROLE[role];
+  const { data, error } = await db
+    .from("users")
+    .select("unique_id")
+    .eq("role", role)
+    .ilike("unique_id", `${prefix}-%`);
+  if (error) throw error;
+
+  const maxSeq = (data || []).reduce((max, row) => {
+    const raw = String(row.unique_id || "");
+    if (!raw.startsWith(`${prefix}-`)) return max;
+    const seq = Number(raw.slice(prefix.length + 1));
+    return Number.isInteger(seq) && seq > max ? seq : max;
+  }, 0);
+
+  return buildUserUniqueId(role, maxSeq + 1);
+}
+
+function isUniqueConstraintError(error) {
+  const msg = String(error?.message || "");
+  return error?.code === "23505" || msg.includes("duplicate key value") || msg.includes("users_unique_id_key");
+}
+
+function isUserUniqueIdError(error) {
+  const msg = String(error?.message || "");
+  const details = String(error?.details || "");
+  return msg.includes("users_unique_id_key") || details.includes("users_unique_id_key");
 }
 
 router.post("/login", async (req, res) => {
@@ -45,7 +76,8 @@ router.post("/logout", async (_req, res) => {
 
 // Admin creates an app user row (Supabase auth user should already exist, or you can extend this later)
 router.post("/register", authorizeRoles("admin"), async (req, res) => {
-  const { id, email, full_name, role, avatar_url } = req.body || {};
+  const { id, full_name, role, avatar_url } = req.body || {};
+  const email = String(req.body?.email || "").trim().toLowerCase();
   if (!id || !email || !full_name || !role) {
     return res.status(400).json({ error: "id, email, full_name, role are required" });
   }
@@ -54,31 +86,51 @@ router.post("/register", authorizeRoles("admin"), async (req, res) => {
   }
 
   const db = getSupabaseAdmin();
+  const [byId, byEmail] = await Promise.all([
+    db.from("users").select("id").eq("id", id).limit(1),
+    db.from("users").select("id").eq("email", email).limit(1)
+  ]);
+  const lookupErr = byId.error || byEmail.error;
+  if (lookupErr) return res.status(400).json({ error: lookupErr.message });
+  if ((byId.data || []).length) {
+    return res.status(409).json({ error: "This Supabase Auth user already has an app user row." });
+  }
+  if ((byEmail.data || []).length) {
+    return res.status(409).json({ error: "This email already has an app user row." });
+  }
 
-  const { count, error: countErr } = await db
-    .from("users")
-    .select("*", { count: "exact", head: true })
-    .eq("role", role);
-  if (countErr) return res.status(400).json({ error: countErr.message });
-  const unique_id = buildUserUniqueId(role, (count || 0) + 1);
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    let unique_id;
+    try {
+      unique_id = await nextUserUniqueId(db, role);
+    } catch (e) {
+      return res.status(400).json({ error: e.message || "Could not generate user ID" });
+    }
 
-  const { data, error } = await db
-    .from("users")
-    .insert([
-      {
-        id,
-        unique_id,
-        email,
-        full_name,
-        role,
-        avatar_url: avatar_url || null
-      }
-    ])
-    .select("*")
-    .single();
+    const { data, error } = await db
+      .from("users")
+      .insert([
+        {
+          id,
+          unique_id,
+          email,
+          full_name,
+          role,
+          avatar_url: avatar_url || null
+        }
+      ])
+      .select("*")
+      .single();
 
-  if (error) return res.status(400).json({ error: error.message });
-  return res.json({ user: data });
+    if (!error) return res.json({ user: data });
+    if (isUserUniqueIdError(error)) continue;
+    if (isUniqueConstraintError(error)) {
+      return res.status(409).json({ error: "This Supabase Auth user or email already has an app user row." });
+    }
+    return res.status(400).json({ error: error.message });
+  }
+
+  return res.status(409).json({ error: "Could not create a unique user ID. Please try again." });
 });
 
 router.get("/me", async (req, res) => {
