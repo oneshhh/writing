@@ -811,47 +811,6 @@ button.danger {
   color: #315b56;
 }
 
-.grammar-popover {
-  position: fixed;
-  z-index: 190;
-  width: min(300px, calc(100vw - 28px));
-  padding: 12px;
-  border: 1px solid rgba(229, 226, 225, 0.95);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.98);
-  box-shadow: 0 18px 44px rgba(13, 43, 34, 0.16);
-}
-
-.grammar-popover-title {
-  color: var(--rw-text);
-  font-size: 13px;
-  font-weight: 750;
-  margin-bottom: 4px;
-}
-
-.grammar-popover-message {
-  color: var(--rw-muted);
-  font-size: 12px;
-  line-height: 1.4;
-  margin-bottom: 10px;
-}
-
-.grammar-popover-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.grammar-popover-actions button {
-  min-height: 30px;
-  padding: 7px 10px;
-  border-radius: 10px;
-  font-size: 12px;
-  background: rgba(13, 43, 34, 0.06);
-  color: var(--rw-primary);
-  box-shadow: none;
-}
-
 .right {
   display: flex;
   gap: 10px;
@@ -1077,6 +1036,27 @@ button.danger {
   flex-wrap: wrap;
 }
 
+.editor-copy-row {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.editor-copy-btn {
+  min-height: 34px;
+  padding: 8px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+.editor-copy-btn .material-symbols-outlined {
+  font-size: 17px;
+  line-height: 1;
+}
+
 .autosave-status {
   min-height: 24px;
   display: inline-flex;
@@ -1129,7 +1109,7 @@ button.danger {
   color: var(--rw-warning);
 }
 
-.grammar-toggle {
+.spellcheck-toggle {
   min-height: 24px;
   display: inline-flex;
   align-items: center;
@@ -1140,13 +1120,13 @@ button.danger {
   cursor: pointer;
 }
 
-.grammar-toggle input {
+.spellcheck-toggle input {
   width: 14px;
   height: 14px;
   accent-color: var(--rw-primary);
 }
 
-.grammar-status {
+.spellcheck-status {
   min-height: 24px;
   display: inline-flex;
   align-items: center;
@@ -1155,29 +1135,12 @@ button.danger {
   font-weight: 650;
 }
 
-.grammar-status.checking {
-  color: var(--rw-accent);
-}
-
-.grammar-status.issues {
-  color: var(--rw-danger);
-}
-
-.grammar-status.ok {
+.spellcheck-status.on {
   color: var(--rw-ok);
 }
 
-.grammar-status.muted {
+.spellcheck-status.off {
   color: var(--rw-muted);
-}
-
-.ql-editor .grammar-issue {
-  text-decoration-line: underline;
-  text-decoration-style: wavy;
-  text-decoration-color: var(--rw-danger);
-  text-decoration-thickness: 1.5px;
-  text-underline-offset: 3px;
-  cursor: pointer;
 }
 
 @keyframes autosavePulse {

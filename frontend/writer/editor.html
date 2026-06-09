@@ -22,7 +22,6 @@
         <div id="networkToastBody">Keep this tab open. Your writing is being saved locally and will sync when the connection returns.</div>
       </div>
     </div>
-    <div class="grammar-popover hidden" id="grammarPopover" role="dialog" aria-live="polite"></div>
     <div class="wrap wide">
       <div class="grid">
         <div class="card" style="grid-column: span 12">
@@ -56,13 +55,19 @@
                   <span class="material-symbols-outlined autosave-icon" id="autosaveIcon" aria-hidden="true">cloud_done</span>
                   <span id="autosaveText">Saved</span>
                 </span>
-                <label class="grammar-toggle" title="Grammar suggestions">
-                  <input id="grammarToggle" type="checkbox" />
-                  <span>Grammar</span>
+                <label class="spellcheck-toggle" title="Browser spellcheck">
+                  <input id="spellcheckToggle" type="checkbox" checked />
+                  <span>Spellcheck</span>
                 </label>
-                <span class="grammar-status" id="grammarStatus">Off</span>
+                <span class="spellcheck-status" id="spellcheckStatus">Browser</span>
               </div>
               <span id="longWords">0 words</span>
+            </div>
+            <div class="editor-copy-row">
+              <button class="secondary editor-copy-btn" id="copyLong" type="button">
+                <span class="material-symbols-outlined" aria-hidden="true">content_copy</span>
+                Copy long description
+              </button>
             </div>
           </div>
           <div class="right" style="margin-top: 12px">
@@ -85,23 +90,6 @@
         const params = new URLSearchParams(window.location.search);
         const id = params.get("id");
         if (!id) { window.location.href = "/writer/dashboard.html"; return; }
-
-        const Inline = Quill.import("blots/inline");
-        class GrammarIssueBlot extends Inline {
-          static create(value) {
-            const node = super.create();
-            node.setAttribute("data-grammar-id", value);
-            return node;
-          }
-
-          static formats(node) {
-            return node.getAttribute("data-grammar-id");
-          }
-        }
-        GrammarIssueBlot.blotName = "grammarIssue";
-        GrammarIssueBlot.tagName = "span";
-        GrammarIssueBlot.className = "grammar-issue";
-        Quill.register(GrammarIssueBlot);
 
         const quill = new Quill("#editor", {
           theme: "snow",
@@ -127,24 +115,19 @@
 
         const msg = (t) => (document.getElementById("msg").textContent = t || "");
         const AUTOSAVE_DELAY_MS = 3000;
-        const GRAMMAR_DELAY_MS = 1400;
-        const GRAMMAR_LANGUAGE = "en-US";
         const autosaveStatus = document.getElementById("autosaveStatus");
         const autosaveIcon = document.getElementById("autosaveIcon");
         const autosaveText = document.getElementById("autosaveText");
-        const grammarToggle = document.getElementById("grammarToggle");
-        const grammarStatus = document.getElementById("grammarStatus");
-        const grammarPopover = document.getElementById("grammarPopover");
+        const spellcheckToggle = document.getElementById("spellcheckToggle");
+        const spellcheckStatus = document.getElementById("spellcheckStatus");
+        const copyLongButton = document.getElementById("copyLong");
         let autosaveTimer = null;
         let autosaveInFlight = false;
         let autosaveQueued = false;
         let autosavePromise = Promise.resolve();
         let autosaveReady = false;
         let lastSavedSnapshot = "";
-        let grammarTimer = null;
-        let grammarRequestSeq = 0;
-        let grammarIssues = [];
-        let grammarEnabled = window.localStorage.getItem("rw:grammar-enabled") === "true";
+        let spellcheckEnabled = window.localStorage.getItem("rw:spellcheck-enabled") !== "false";
 
         const countWords = (text) => {
           const t = String(text || "").replace(/\s+/g, " ").trim();
@@ -163,15 +146,54 @@
           document.getElementById("longWords").textContent = `${n} word${n === 1 ? "" : "s"}`;
         };
 
+        const setEditorSpellcheck = (enabled) => {
+          const value = enabled ? "true" : "false";
+          quill.root.setAttribute("spellcheck", value);
+          quill.root.setAttribute("autocorrect", enabled ? "on" : "off");
+          quill.root.setAttribute("autocomplete", enabled ? "on" : "off");
+          quill.root.setAttribute("lang", "en");
+          document.getElementById("short").setAttribute("spellcheck", value);
+          spellcheckToggle.checked = enabled;
+          spellcheckStatus.textContent = enabled ? "Browser" : "Off";
+          spellcheckStatus.className = `spellcheck-status ${enabled ? "on" : "off"}`;
+        };
+
         const cleanEditorHtml = () => {
           const clone = quill.root.cloneNode(true);
-          for (const marker of clone.querySelectorAll("span.grammar-issue")) {
-            const parent = marker.parentNode;
-            while (marker.firstChild) parent.insertBefore(marker.firstChild, marker);
-            parent.removeChild(marker);
-          }
           return clone.innerHTML;
         };
+
+        async function copyLongDescription() {
+          const html = cleanEditorHtml();
+          const text = quill.getText().replace(/\n$/, "");
+          if (!text.trim() && !html.trim()) {
+            msg("Nothing to copy.");
+            return;
+          }
+
+          try {
+            if (window.ClipboardItem && navigator.clipboard?.write) {
+              await navigator.clipboard.write([
+                new ClipboardItem({
+                  "text/plain": new Blob([text], { type: "text/plain" }),
+                  "text/html": new Blob([html], { type: "text/html" })
+                })
+              ]);
+            } else if (navigator.clipboard?.writeText) {
+              await navigator.clipboard.writeText(text);
+            } else {
+              throw new Error("Clipboard unavailable");
+            }
+            msg("Long description copied.");
+          } catch (e) {
+            try {
+              await navigator.clipboard.writeText(text);
+              msg("Long description copied.");
+            } catch (_fallbackErr) {
+              msg("Could not copy. Please select the text and copy manually.");
+            }
+          }
+        }
 
         const getDraftPayload = () => ({
           title: document.getElementById("title").value.trim(),
@@ -269,126 +291,6 @@
             "Keep this tab open. Your writing is saved locally and will sync when the connection returns.",
             "offline"
           );
-        };
-
-        const setGrammarStatus = (text, state = "") => {
-          grammarStatus.textContent = text;
-          grammarStatus.className = `grammar-status ${state}`.trim();
-        };
-
-        const hideGrammarPopover = () => {
-          grammarPopover.classList.add("hidden");
-          grammarPopover.innerHTML = "";
-        };
-
-        const clearGrammarIssues = () => {
-          clearTimeout(grammarTimer);
-          grammarIssues = [];
-          hideGrammarPopover();
-          if (quill.getLength() > 1) {
-            quill.formatText(0, quill.getLength(), "grammarIssue", false, "silent");
-          }
-        };
-
-        const applyGrammarIssues = (matches) => {
-          clearGrammarIssues();
-          grammarIssues = (matches || [])
-            .filter((match) => Number.isFinite(match.offset) && Number.isFinite(match.length) && match.length > 0)
-            .filter((match) => Array.isArray(match.replacements) && match.replacements.length)
-            .slice(0, 60)
-            .map((match, index) => ({
-              id: `grammar-${grammarRequestSeq}-${index}`,
-              offset: match.offset,
-              length: match.length,
-              message: match.message || "Grammar suggestion",
-              shortMessage: match.shortMessage || "",
-              replacements: match.replacements.slice(0, 5).map((replacement) => String(replacement.value || "")).filter(Boolean)
-            }))
-            .filter((issue) => issue.replacements.length);
-
-          for (const issue of grammarIssues) {
-            quill.formatText(issue.offset, issue.length, "grammarIssue", issue.id, "silent");
-          }
-
-          setGrammarStatus(grammarIssues.length ? `${grammarIssues.length} issue${grammarIssues.length === 1 ? "" : "s"}` : "No issues", grammarIssues.length ? "issues" : "ok");
-        };
-
-        const runGrammarCheck = async () => {
-          if (!grammarEnabled || !autosaveReady) return;
-          hideGrammarPopover();
-          if (!navigator.onLine) {
-            clearGrammarIssues();
-            setGrammarStatus("Offline", "muted");
-            return;
-          }
-
-          const text = quill.getText();
-          if (!text.trim() || text.trim().length < 3) {
-            clearGrammarIssues();
-            setGrammarStatus("No issues", "ok");
-            return;
-          }
-
-          const requestSeq = ++grammarRequestSeq;
-          setGrammarStatus("Checking...", "checking");
-          try {
-            const result = await APP.apiFetch("/api/grammar/check", {
-              method: "POST",
-              body: JSON.stringify({ text, language: GRAMMAR_LANGUAGE }),
-              skipLoader: true
-            });
-            if (requestSeq !== grammarRequestSeq || !grammarEnabled) return;
-            if (result.enabled === false) {
-              clearGrammarIssues();
-              setGrammarStatus("Unavailable", "muted");
-              return;
-            }
-            applyGrammarIssues(result.matches || []);
-          } catch (e) {
-            if (requestSeq !== grammarRequestSeq || !grammarEnabled) return;
-            clearGrammarIssues();
-            setGrammarStatus("Unavailable", "muted");
-          }
-        };
-
-        const scheduleGrammarCheck = () => {
-          if (!grammarEnabled || !autosaveReady) return;
-          clearTimeout(grammarTimer);
-          grammarTimer = setTimeout(runGrammarCheck, GRAMMAR_DELAY_MS);
-        };
-
-        const replaceGrammarIssue = (issue, replacement) => {
-          if (!issue || !replacement) return;
-          clearGrammarIssues();
-          quill.deleteText(issue.offset, issue.length, "user");
-          quill.insertText(issue.offset, replacement, "user");
-          quill.setSelection(issue.offset + replacement.length, 0, "silent");
-          scheduleAutosave();
-          scheduleGrammarCheck();
-        };
-
-        const showGrammarPopover = (issue, target) => {
-          if (!issue) return;
-          const replacements = issue.replacements
-            .map((replacement, index) => `<button type="button" data-replacement="${index}">${APP.escapeHtml(replacement)}</button>`)
-            .join("");
-          grammarPopover.innerHTML = `
-            <div class="grammar-popover-title">${APP.escapeHtml(issue.shortMessage || "Suggestion")}</div>
-            <div class="grammar-popover-message">${APP.escapeHtml(issue.message)}</div>
-            <div class="grammar-popover-actions">${replacements}</div>
-          `;
-
-          const rect = target.getBoundingClientRect();
-          const width = 300;
-          const left = Math.max(14, Math.min(window.innerWidth - width - 14, rect.left));
-          const top = Math.max(84, rect.bottom + 8);
-          grammarPopover.style.left = `${left}px`;
-          grammarPopover.style.top = `${top}px`;
-          grammarPopover.classList.remove("hidden");
-
-          for (const button of grammarPopover.querySelectorAll("button[data-replacement]")) {
-            button.onclick = () => replaceGrammarIssue(issue, issue.replacements[Number(button.getAttribute("data-replacement"))]);
-          }
         };
 
         const scheduleAutosave = () => {
@@ -531,10 +433,9 @@
         if (!canEdit) {
           document.getElementById("save").disabled = true;
           document.getElementById("submit").disabled = true;
-          grammarToggle.disabled = true;
-          grammarEnabled = false;
-          grammarToggle.checked = false;
-          setGrammarStatus("Off");
+          copyLongButton.disabled = false;
+          spellcheckToggle.disabled = true;
+          setEditorSpellcheck(false);
           msg("This article is read-only in its current status.");
           setAutosaveState("idle");
         } else {
@@ -543,8 +444,9 @@
           document.getElementById("short").disabled = false;
           document.getElementById("save").disabled = false;
           document.getElementById("submit").disabled = false;
-          grammarToggle.checked = grammarEnabled;
-          setGrammarStatus(grammarEnabled ? "Ready" : "Off");
+          copyLongButton.disabled = false;
+          spellcheckToggle.disabled = false;
+          setEditorSpellcheck(spellcheckEnabled);
           quill.enable(true);
           lastSavedSnapshot = getDraftSnapshot();
           autosaveReady = true;
@@ -554,7 +456,6 @@
           } else {
             setAutosaveState("saved");
           }
-          if (grammarEnabled) scheduleGrammarCheck();
         }
 
         document.getElementById("title").addEventListener("input", scheduleAutosave);
@@ -566,46 +467,21 @@
         quill.on("text-change", (_delta, _oldDelta, source) => {
           renderLongCount();
           if (source === "user") {
-            clearGrammarIssues();
             scheduleAutosave();
-            scheduleGrammarCheck();
           }
         });
-        quill.root.addEventListener("click", (e) => {
-          const marker = e.target.closest(".grammar-issue");
-          if (!marker) return;
-          const issue = grammarIssues.find((item) => item.id === marker.getAttribute("data-grammar-id"));
-          if (!issue) return;
-          e.preventDefault();
-          showGrammarPopover(issue, marker);
+        spellcheckToggle.addEventListener("change", () => {
+          spellcheckEnabled = spellcheckToggle.checked;
+          window.localStorage.setItem("rw:spellcheck-enabled", spellcheckEnabled ? "true" : "false");
+          setEditorSpellcheck(spellcheckEnabled);
         });
-        document.addEventListener("click", (e) => {
-          if (grammarPopover.classList.contains("hidden")) return;
-          if (grammarPopover.contains(e.target) || e.target.closest(".grammar-issue")) return;
-          hideGrammarPopover();
-        });
-        grammarToggle.addEventListener("change", () => {
-          grammarEnabled = grammarToggle.checked;
-          window.localStorage.setItem("rw:grammar-enabled", grammarEnabled ? "true" : "false");
-          clearGrammarIssues();
-          if (grammarEnabled) {
-            setGrammarStatus("Ready");
-            scheduleGrammarCheck();
-          } else {
-            setGrammarStatus("Off");
-          }
-        });
+        copyLongButton.addEventListener("click", copyLongDescription);
 
         window.addEventListener("offline", () => {
           if (autosaveReady) markOfflineDraft();
-          if (grammarEnabled) {
-            clearGrammarIssues();
-            setGrammarStatus("Offline", "muted");
-          }
         });
         window.addEventListener("online", () => {
           if (autosaveReady) syncLocalDraft();
-          if (grammarEnabled) scheduleGrammarCheck();
         });
         window.addEventListener("beforeunload", (e) => {
           const localDraft = readLocalDraft();
