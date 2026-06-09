@@ -49,7 +49,7 @@
 
         <div class="card">
           <h2>Payment History</h2>
-          <div class="two" style="margin: 10px 0 12px 0; align-items:end;">
+          <div class="two payment-filter-grid" style="margin: 10px 0 12px 0; align-items:end;">
             <div>
               <label class="muted">Project</label>
               <select id="project"></select>
@@ -59,7 +59,7 @@
               <select id="writer"></select>
             </div>
           </div>
-          <div class="two" style="margin: 0 0 12px 0; align-items:end;">
+          <div class="two payment-filter-grid" style="margin: 0 0 12px 0; align-items:end;">
             <div>
               <label class="muted">From</label>
               <input id="from" type="date" />
@@ -69,7 +69,7 @@
               <input id="to" type="date" />
             </div>
           </div>
-          <div class="right" style="margin: 0 0 12px 0; flex-wrap: wrap;">
+          <div class="right payment-filter-actions" style="margin: 0 0 12px 0; flex-wrap: wrap;">
             <button class="secondary" id="prevMonth" type="button">←</button>
             <span class="pill" id="monthLabel">This month</span>
             <button class="secondary" id="nextMonth" type="button">→</button>
@@ -77,7 +77,7 @@
             <button class="secondary" id="clear" type="button">Reset</button>
           </div>
 
-          <table>
+          <table class="mobile-stack-table payment-history-table admin-payment-history-table">
             <thead>
               <tr>
                 <th>Article</th>
@@ -184,18 +184,18 @@
               const writer = u?.full_name || "Writer";
               const email = u?.email || "";
               return `<tr>
-                <td>
+                <td data-label="Article">
                   <div style="font-weight:800">${APP.escapeHtml(title)}</div>
                   <div class="muted">${APP.escapeHtml(uid)} • ${APP.escapeHtml(aStatus)}</div>
                 </td>
-                <td>
+                <td data-label="Writer">
                   <div style="font-weight:750">${APP.escapeHtml(writer)}</div>
                   <div class="muted">${APP.escapeHtml(email)}</div>
                 </td>
                 <td>₹${APP.escapeHtml(Number(p.amount || 0).toFixed(0))}</td>
                 <td>${p.status === "paid" ? "<span class='badge b-approved'>paid</span>" : "<span class='badge b-submitted'>pending</span>"}</td>
-                <td class="muted">${APP.escapeHtml(new Date(p.created_at).toLocaleString())}</td>
-                <td class="muted">${p.paid_at ? APP.escapeHtml(new Date(p.paid_at).toLocaleString()) : "-"}</td>
+                <td class="muted" data-label="Created">${APP.escapeHtml(new Date(p.created_at).toLocaleString())}</td>
+                <td class="muted" data-label="Paid at">${p.paid_at ? APP.escapeHtml(new Date(p.paid_at).toLocaleString()) : "-"}</td>
               </tr>`;
             })
             .join("");

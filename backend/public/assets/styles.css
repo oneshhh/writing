@@ -1044,6 +1044,79 @@ button.danger {
     width: 100%;
   }
 
+  .payment-history-table td:first-child {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .payment-history-table td:first-child::before {
+    margin-bottom: 2px;
+  }
+
+  .payment-history-table td:nth-child(2)::before {
+    content: "Amount";
+  }
+
+  .payment-history-table td:nth-child(3)::before {
+    content: "Status";
+  }
+
+  .payment-history-table td:nth-child(4)::before {
+    content: "Created";
+  }
+
+  .payment-history-table td:nth-child(5)::before {
+    content: "Paid at";
+  }
+
+  .admin-payment-history-table td:nth-child(2)::before {
+    content: "Writer";
+  }
+
+  .admin-payment-history-table td:nth-child(3)::before {
+    content: "Amount";
+  }
+
+  .admin-payment-history-table td:nth-child(4)::before {
+    content: "Status";
+  }
+
+  .admin-payment-history-table td:nth-child(5)::before {
+    content: "Created";
+  }
+
+  .admin-payment-history-table td:nth-child(6)::before {
+    content: "Paid at";
+  }
+
+  .payment-filter-grid {
+    gap: 10px;
+  }
+
+  .payment-filter-actions {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .payment-filter-actions #monthLabel {
+    justify-content: center;
+    width: 100%;
+    min-height: 40px;
+  }
+
+  .payment-filter-actions #apply,
+  .payment-filter-actions #clear {
+    grid-column: span 3;
+    width: 100%;
+  }
+
+  .payment-filter-actions button {
+    min-height: 40px;
+    padding-inline: 10px;
+  }
+
   .right {
     justify-content: flex-start;
   }

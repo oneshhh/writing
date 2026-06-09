@@ -36,7 +36,7 @@
 
         <div class="card">
           <h2>Payment History</h2>
-          <table>
+          <table class="mobile-stack-table payment-history-table">
             <thead>
               <tr>
                 <th>Article</th>
@@ -112,7 +112,7 @@
               const uid = a?.unique_id || p.article_id;
               const status = a?.status || "-";
               return `<tr>
-                <td>
+                <td data-label="Article">
                   <div style="font-weight:750">${APP.escapeHtml(title)}</div>
                   <div class="muted">${APP.escapeHtml(uid)} • ${APP.escapeHtml(status)}</div>
                 </td>
@@ -122,8 +122,8 @@
                     ? "<span class='badge b-approved'>paid</span>"
                     : "<span class='badge b-submitted'>pending</span>"
                 }</td>
-                <td class="muted">${APP.escapeHtml(new Date(p.created_at).toLocaleString())}</td>
-                <td class="muted">${p.paid_at ? APP.escapeHtml(new Date(p.paid_at).toLocaleString()) : "-"}</td>
+                <td class="muted" data-label="Created">${APP.escapeHtml(new Date(p.created_at).toLocaleString())}</td>
+                <td class="muted" data-label="Paid at">${p.paid_at ? APP.escapeHtml(new Date(p.paid_at).toLocaleString()) : "-"}</td>
               </tr>`;
             })
             .join("");
