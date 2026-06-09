@@ -322,6 +322,7 @@
           lastSavedSnapshot = snapshot;
           document.getElementById("statusBadge").innerHTML = APP.badgeForStatus(updated.article.status);
           setAutosaveState("saved");
+          hideNetworkToastSoon();
           if (getDraftSnapshot() === snapshot) {
             clearLocalDraft();
           } else {
