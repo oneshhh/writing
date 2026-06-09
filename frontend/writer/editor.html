@@ -115,6 +115,7 @@
 
         const msg = (t) => (document.getElementById("msg").textContent = t || "");
         const AUTOSAVE_DELAY_MS = 3000;
+        const AUTOSAVE_RETRY_MS = 10000;
         const autosaveStatus = document.getElementById("autosaveStatus");
         const autosaveIcon = document.getElementById("autosaveIcon");
         const autosaveText = document.getElementById("autosaveText");
@@ -260,6 +261,11 @@
           try { window.localStorage.removeItem(localDraftKey()); } catch (e) {}
         };
 
+        const isNetworkError = (error) => {
+          const text = String(error?.message || error || "");
+          return /cannot reach api|failed to fetch|networkerror|load failed|err_network|err_internet_disconnected/i.test(text);
+        };
+
         const applyDraftPayload = (payload) => {
           if (!payload) return;
           document.getElementById("title").value = payload.title || "";
@@ -331,10 +337,6 @@
             setAutosaveState("saved");
             return;
           }
-          if (!navigator.onLine) {
-            markOfflineDraft();
-            return;
-          }
           if (autosaveInFlight) {
             autosaveQueued = true;
             return;
@@ -344,19 +346,26 @@
           autosaveQueued = false;
           setAutosaveState("saving");
           let autosaveFailed = false;
+          let retryAutosave = false;
 
           try {
             autosavePromise = persistDraft({ skipLoader: true });
             await autosavePromise;
           } catch (e) {
             autosaveFailed = true;
-            markOfflineDraft();
+            retryAutosave = isNetworkError(e);
+            if (retryAutosave) {
+              markOfflineDraft();
+            } else {
+              setAutosaveState("error");
+              msg(e.message || String(e));
+            }
           } finally {
             autosaveInFlight = false;
             if (autosaveQueued || getDraftSnapshot() !== lastSavedSnapshot) {
               if (autosaveFailed) {
                 clearTimeout(autosaveTimer);
-                if (navigator.onLine) autosaveTimer = setTimeout(() => autosave(), AUTOSAVE_DELAY_MS);
+                if (retryAutosave) autosaveTimer = setTimeout(() => autosave(), AUTOSAVE_RETRY_MS);
               } else {
                 scheduleAutosave();
               }
@@ -372,7 +381,7 @@
         }
 
         const syncLocalDraft = async () => {
-          if (!autosaveReady || !navigator.onLine) return;
+          if (!autosaveReady) return;
           const localDraft = readLocalDraft();
           if (!localDraft || localDraft.synced) return;
           setAutosaveState("syncing", "Syncing...");
@@ -382,7 +391,12 @@
             await persistDraft({ skipLoader: true });
             hideNetworkToastSoon();
           } catch (e) {
-            markOfflineDraft();
+            if (isNetworkError(e)) {
+              markOfflineDraft();
+            } else {
+              setAutosaveState("error");
+              msg(e.message || String(e));
+            }
           }
         };
 
@@ -424,7 +438,7 @@
             showNetworkToast(
               "Local draft restored",
               "We found unsynced changes in this browser. Keep this tab open while it syncs.",
-              navigator.onLine ? "online" : "offline"
+              "online"
             );
           } else {
             clearLocalDraft();
@@ -451,7 +465,7 @@
           lastSavedSnapshot = getDraftSnapshot();
           autosaveReady = true;
           if (restoredLocalDraft) {
-            setAutosaveState(navigator.onLine ? "syncing" : "local", navigator.onLine ? "Syncing..." : "Saved locally");
+            setAutosaveState("syncing", "Syncing...");
             syncLocalDraft();
           } else {
             setAutosaveState("saved");
@@ -478,7 +492,11 @@
         copyLongButton.addEventListener("click", copyLongDescription);
 
         window.addEventListener("offline", () => {
-          if (autosaveReady) markOfflineDraft();
+          if (!autosaveReady) return;
+          if (getDraftSnapshot() !== lastSavedSnapshot) {
+            writeLocalDraft({ synced: false });
+            setAutosaveState("local", "Saved locally");
+          }
         });
         window.addEventListener("online", () => {
           if (autosaveReady) syncLocalDraft();
@@ -495,16 +513,16 @@
           msg("");
           try {
             await waitForAutosaveIdle();
-            if (!navigator.onLine) {
-              markOfflineDraft();
-              msg("Saved locally. It will sync when the connection returns.");
-              return;
-            }
             await persistDraft();
             msg("Saved.");
           } catch (e) {
-            markOfflineDraft();
-            msg(e.message || String(e));
+            if (isNetworkError(e)) {
+              markOfflineDraft();
+              msg("Saved locally. It will sync when the connection returns.");
+            } else {
+              setAutosaveState("error");
+              msg(e.message || String(e));
+            }
           }
         };
         document.getElementById("submit").onclick = async () => {
@@ -517,8 +535,15 @@
               errorSymbol: "error",
               action: async () => {
                 await waitForAutosaveIdle();
-                if (!navigator.onLine) throw new Error("You are offline. Keep this tab open until the draft syncs, then submit.");
-                await persistDraft({ skipLoader: true });
+                try {
+                  await persistDraft({ skipLoader: true });
+                } catch (e) {
+                  if (isNetworkError(e)) {
+                    markOfflineDraft();
+                    throw new Error("Saved locally. It will sync when the connection returns, then you can submit.");
+                  }
+                  throw e;
+                }
                 return APP.apiFetch(`/api/articles/${encodeURIComponent(id)}/submit`, { method: "POST", skipLoader: true });
               }
             });
