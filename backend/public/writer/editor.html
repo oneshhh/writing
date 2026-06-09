@@ -15,6 +15,13 @@
   </head>
   <body>
     <div class="topbar" id="topbar"></div>
+    <div class="network-toast hidden" id="networkToast" role="alert" aria-live="assertive">
+      <span class="material-symbols-outlined" aria-hidden="true">wifi_off</span>
+      <div>
+        <strong id="networkToastTitle">Network connection lost</strong>
+        <div id="networkToastBody">Keep this tab open. Your writing is being saved locally and will sync when the connection returns.</div>
+      </div>
+    </div>
     <div class="wrap wide">
       <div class="grid">
         <div class="card" style="grid-column: span 12">
@@ -140,6 +147,8 @@
             unsaved: "cloud_queue",
             saving: "cloud_sync",
             saved: "cloud_done",
+            local: "cloud_off",
+            syncing: "cloud_sync",
             error: "cloud_off"
           };
           autosaveStatus.className = `autosave-status ${state === "idle" ? "is-idle" : state}`;
@@ -149,12 +158,78 @@
             unsaved: "Autosave pending",
             saving: "Saving...",
             saved: "Saved",
+            local: "Saved locally",
+            syncing: "Syncing...",
             error: "Autosave failed"
           }[state] || "Saved";
         };
 
+        const localDraftKey = () => `rw:article-draft:${user.id}:${id}`;
+        const readLocalDraft = () => {
+          try {
+            const raw = window.localStorage.getItem(localDraftKey());
+            return raw ? JSON.parse(raw) : null;
+          } catch (e) {
+            return null;
+          }
+        };
+
+        const writeLocalDraft = ({ synced = false } = {}) => {
+          if (!autosaveReady) return;
+          try {
+            window.localStorage.setItem(localDraftKey(), JSON.stringify({
+              article_id: id,
+              user_id: user.id,
+              payload: getDraftPayload(),
+              snapshot: getDraftSnapshot(),
+              synced,
+              updatedAt: Date.now()
+            }));
+          } catch (e) {
+            // localStorage can fail when storage is full or disabled; server autosave still protects online users.
+          }
+        };
+
+        const clearLocalDraft = () => {
+          try { window.localStorage.removeItem(localDraftKey()); } catch (e) {}
+        };
+
+        const applyDraftPayload = (payload) => {
+          if (!payload) return;
+          document.getElementById("title").value = payload.title || "";
+          document.getElementById("short").value = payload.short_description || "";
+          document.getElementById("tags").value = Array.isArray(payload.seo_tags) ? payload.seo_tags.join(", ") : "";
+          quill.root.innerHTML = payload.long_description || "";
+          renderShortCount();
+          renderLongCount();
+        };
+
+        const showNetworkToast = (title, body, mode = "offline") => {
+          const toast = document.getElementById("networkToast");
+          toast.className = `network-toast ${mode}`;
+          document.getElementById("networkToastTitle").textContent = title;
+          document.getElementById("networkToastBody").textContent = body;
+        };
+
+        const hideNetworkToastSoon = () => {
+          const toast = document.getElementById("networkToast");
+          toast.classList.add("online");
+          setTimeout(() => toast.classList.add("hidden"), 2400);
+        };
+
+        const markOfflineDraft = () => {
+          writeLocalDraft({ synced: false });
+          setAutosaveState("local", "Saved locally");
+          showNetworkToast(
+            "Network connection lost",
+            "Keep this tab open. Your writing is saved locally and will sync when the connection returns.",
+            "offline"
+          );
+        };
+
         const scheduleAutosave = () => {
           if (!autosaveReady) return;
+          writeLocalDraft({ synced: false });
           clearTimeout(autosaveTimer);
           if (getDraftSnapshot() === lastSavedSnapshot) {
             setAutosaveState("saved");
@@ -175,6 +250,11 @@
           lastSavedSnapshot = snapshot;
           document.getElementById("statusBadge").innerHTML = APP.badgeForStatus(updated.article.status);
           setAutosaveState("saved");
+          if (getDraftSnapshot() === snapshot) {
+            clearLocalDraft();
+          } else {
+            writeLocalDraft({ synced: false });
+          }
           return updated;
         }
 
@@ -183,6 +263,10 @@
           const snapshot = getDraftSnapshot();
           if (snapshot === lastSavedSnapshot) {
             setAutosaveState("saved");
+            return;
+          }
+          if (!navigator.onLine) {
+            markOfflineDraft();
             return;
           }
           if (autosaveInFlight) {
@@ -200,13 +284,13 @@
             await autosavePromise;
           } catch (e) {
             autosaveFailed = true;
-            setAutosaveState("error");
+            markOfflineDraft();
           } finally {
             autosaveInFlight = false;
             if (autosaveQueued || getDraftSnapshot() !== lastSavedSnapshot) {
               if (autosaveFailed) {
                 clearTimeout(autosaveTimer);
-                autosaveTimer = setTimeout(() => autosave(), AUTOSAVE_DELAY_MS);
+                if (navigator.onLine) autosaveTimer = setTimeout(() => autosave(), AUTOSAVE_DELAY_MS);
               } else {
                 scheduleAutosave();
               }
@@ -220,6 +304,21 @@
             try { await autosavePromise; } catch (e) {}
           }
         }
+
+        const syncLocalDraft = async () => {
+          if (!autosaveReady || !navigator.onLine) return;
+          const localDraft = readLocalDraft();
+          if (!localDraft || localDraft.synced) return;
+          setAutosaveState("syncing", "Syncing...");
+          showNetworkToast("Connection restored", "Syncing your local draft to the database.", "online");
+          try {
+            applyDraftPayload(localDraft.payload);
+            await persistDraft({ skipLoader: true });
+            hideNetworkToastSoon();
+          } catch (e) {
+            markOfflineDraft();
+          }
+        };
 
         APP.ui.textSkeleton("statusBadge", { kind: "line", width: "80px" });
         document.getElementById("title").disabled = true;
@@ -248,6 +347,23 @@
         renderLongCount();
 
         const canEdit = article.status === "draft" || article.status === "rework";
+        let restoredLocalDraft = false;
+        const localDraft = readLocalDraft();
+        if (canEdit && localDraft?.payload && localDraft.synced === false) {
+          const localUpdatedAt = Number(localDraft.updatedAt || 0);
+          const serverUpdatedAt = Date.parse(article.updated_at || article.created_at || "") || 0;
+          if (localUpdatedAt > serverUpdatedAt) {
+            applyDraftPayload(localDraft.payload);
+            restoredLocalDraft = true;
+            showNetworkToast(
+              "Local draft restored",
+              "We found unsynced changes in this browser. Keep this tab open while it syncs.",
+              navigator.onLine ? "online" : "offline"
+            );
+          } else {
+            clearLocalDraft();
+          }
+        }
         if (!canEdit) {
           document.getElementById("save").disabled = true;
           document.getElementById("submit").disabled = true;
@@ -262,7 +378,12 @@
           quill.enable(true);
           lastSavedSnapshot = getDraftSnapshot();
           autosaveReady = true;
-          setAutosaveState("saved");
+          if (restoredLocalDraft) {
+            setAutosaveState(navigator.onLine ? "syncing" : "local", navigator.onLine ? "Syncing..." : "Saved locally");
+            syncLocalDraft();
+          } else {
+            setAutosaveState("saved");
+          }
         }
 
         document.getElementById("title").addEventListener("input", scheduleAutosave);
@@ -276,13 +397,33 @@
           if (source === "user") scheduleAutosave();
         });
 
+        window.addEventListener("offline", () => {
+          if (autosaveReady) markOfflineDraft();
+        });
+        window.addEventListener("online", () => {
+          if (autosaveReady) syncLocalDraft();
+        });
+        window.addEventListener("beforeunload", (e) => {
+          const localDraft = readLocalDraft();
+          if (localDraft && localDraft.synced === false) {
+            e.preventDefault();
+            e.returnValue = "";
+          }
+        });
+
         document.getElementById("save").onclick = async () => {
           msg("");
           try {
             await waitForAutosaveIdle();
+            if (!navigator.onLine) {
+              markOfflineDraft();
+              msg("Saved locally. It will sync when the connection returns.");
+              return;
+            }
             await persistDraft();
             msg("Saved.");
           } catch (e) {
+            markOfflineDraft();
             msg(e.message || String(e));
           }
         };
@@ -296,6 +437,7 @@
               errorSymbol: "error",
               action: async () => {
                 await waitForAutosaveIdle();
+                if (!navigator.onLine) throw new Error("You are offline. Keep this tab open until the draft syncs, then submit.");
                 await persistDraft({ skipLoader: true });
                 return APP.apiFetch(`/api/articles/${encodeURIComponent(id)}/submit`, { method: "POST", skipLoader: true });
               }

@@ -756,6 +756,61 @@ button.danger {
   display: none;
 }
 
+.network-toast {
+  position: fixed;
+  top: 72px;
+  left: 50%;
+  z-index: 180;
+  width: min(560px, calc(100vw - 28px));
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid rgba(178, 106, 0, 0.26);
+  border-radius: 16px;
+  background: rgba(255, 248, 235, 0.96);
+  color: #4a3514;
+  box-shadow: 0 18px 44px rgba(65, 48, 31, 0.14);
+  transform: translateX(-50%);
+}
+
+.network-toast .material-symbols-outlined {
+  color: var(--rw-warning);
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.network-toast strong {
+  display: block;
+  color: #35240c;
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+
+.network-toast div div {
+  color: #60471f;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.network-toast.online {
+  border-color: rgba(15, 118, 110, 0.22);
+  background: rgba(236, 253, 245, 0.96);
+  color: #123d39;
+}
+
+.network-toast.online .material-symbols-outlined {
+  color: var(--rw-ok);
+}
+
+.network-toast.online strong {
+  color: #123d39;
+}
+
+.network-toast.online div div {
+  color: #315b56;
+}
+
 .right {
   display: flex;
   gap: 10px;
@@ -998,7 +1053,15 @@ button.danger {
   color: var(--rw-accent);
 }
 
+.autosave-status.syncing {
+  color: var(--rw-accent);
+}
+
 .autosave-status.saving .autosave-icon {
+  animation: autosavePulse 1s ease-in-out infinite;
+}
+
+.autosave-status.syncing .autosave-icon {
   animation: autosavePulse 1s ease-in-out infinite;
 }
 
@@ -1012,6 +1075,10 @@ button.danger {
 
 .autosave-status.error {
   color: var(--rw-danger);
+}
+
+.autosave-status.local {
+  color: var(--rw-warning);
 }
 
 @keyframes autosavePulse {
