@@ -502,14 +502,6 @@
         window.addEventListener("online", () => {
           if (autosaveReady) syncLocalDraft();
         });
-        window.addEventListener("beforeunload", (e) => {
-          const localDraft = readLocalDraft();
-          if (localDraft && localDraft.synced === false) {
-            e.preventDefault();
-            e.returnValue = "";
-          }
-        });
-
         document.getElementById("save").onclick = async () => {
           msg("");
           try {
