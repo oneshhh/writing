@@ -121,9 +121,9 @@ async function renderTopbar({ role, links }) {
   }
   backdrop.onclick = () => document.body.classList.remove("rw-sidebar-open");
 
-  // Desktop/tablet: ensure sidebar isn't accidentally left "open" state.
+  // Desktop: ensure sidebar isn't accidentally left in an "open" state.
   const syncSidebarState = () => {
-    const mobile = window.matchMedia("(max-width: 900px) and (hover: none) and (pointer: coarse)").matches;
+    const mobile = window.matchMedia("(max-width: 900px)").matches;
     if (!mobile) document.body.classList.remove("rw-sidebar-open");
   };
   syncSidebarState();

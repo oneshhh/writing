@@ -42,7 +42,7 @@
             <a href="/writer/submit.html"><button>New article</button></a>
           </div>
           <h2>My Articles</h2>
-          <table>
+          <table class="mobile-stack-table writer-articles-table">
             <thead>
               <tr>
                 <th>Title</th>
@@ -80,7 +80,7 @@
         APP.ui.textSkeleton("nApproved", { kind: "num", width: "54%" });
         APP.ui.textSkeleton("nRejected", { kind: "num", width: "54%" });
         APP.ui.textSkeleton("nRework", { kind: "num", width: "54%" });
-        APP.ui.tableSkeleton("rows", { rows: 8, cols: 9 });
+        APP.ui.tableSkeleton("rows", { rows: 8, cols: 8 });
         APP.ui.textSkeleton("pageInfo", { kind: "line", width: "120px" });
 
         const pageSize = 20;
@@ -94,14 +94,14 @@
               const canEdit = a.status === "draft" || a.status === "rework";
               return `
                 <tr>
-                  <td>${APP.escapeHtml(a.title)}</td>
-                  <td class="muted">${APP.escapeHtml(projectName.get(a.project_id) || a.project_id)}</td>
-                  <td>${APP.badgeForStatus(a.status)}</td>
-                  <td>${APP.checkBadge(a.ai_score)}</td>
-                  <td>${APP.checkBadge(a.plagiarism_score)}</td>
-                  <td class="muted">${APP.escapeHtml(new Date(a.updated_at || a.created_at).toLocaleString())}</td>
-                  <td class="muted">${APP.escapeHtml(a.manager_note || "")}</td>
-                  <td class="right">
+                  <td data-label="Title">${APP.escapeHtml(a.title)}</td>
+                  <td class="muted" data-label="Project">${APP.escapeHtml(projectName.get(a.project_id) || a.project_id)}</td>
+                  <td data-label="Status">${APP.badgeForStatus(a.status)}</td>
+                  <td data-label="AI">${APP.checkBadge(a.ai_score)}</td>
+                  <td data-label="Plagiarism">${APP.checkBadge(a.plagiarism_score)}</td>
+                  <td class="muted" data-label="Updated">${APP.escapeHtml(new Date(a.updated_at || a.created_at).toLocaleString())}</td>
+                  <td class="muted" data-label="Remark">${APP.escapeHtml(a.manager_note || "")}</td>
+                  <td class="right" data-label="Action">
                     <a href="/writer/editor.html?id=${encodeURIComponent(a.id)}"><button class="secondary">${canEdit ? "Edit" : "View"}</button></a>
                   </td>
                 </tr>`;
@@ -118,7 +118,7 @@
         }
 
         async function loadPage() {
-          APP.ui.tableSkeleton("rows", { rows: 8, cols: 9 });
+          APP.ui.tableSkeleton("rows", { rows: 8, cols: 8 });
           const list = await APP.apiFetch(`/api/articles?limit=${pageSize}&offset=${offset}`);
           total = list.total ?? total;
           renderRows(list.articles || []);
