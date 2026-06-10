@@ -69,6 +69,20 @@
                 Copy long description
               </button>
             </div>
+            <div class="editor-download-row">
+              <button class="secondary editor-download-btn" data-download-format="pdf" type="button" disabled>
+                <span class="material-symbols-outlined" aria-hidden="true">picture_as_pdf</span>
+                Download PDF
+              </button>
+              <button class="secondary editor-download-btn" data-download-format="docx" type="button" disabled>
+                <span class="material-symbols-outlined" aria-hidden="true">description</span>
+                Download Word
+              </button>
+              <button class="secondary editor-download-btn" data-download-format="txt" type="button" disabled>
+                <span class="material-symbols-outlined" aria-hidden="true">article</span>
+                Download TXT
+              </button>
+            </div>
           </div>
           <div class="right editor-form-actions" style="margin-top: 12px">
             <span class="badge" id="statusBadge"></span>
@@ -122,6 +136,7 @@
         const spellcheckToggle = document.getElementById("spellcheckToggle");
         const spellcheckStatus = document.getElementById("spellcheckStatus");
         const copyLongButton = document.getElementById("copyLong");
+        const downloadButtons = Array.from(document.querySelectorAll("[data-download-format]"));
         let autosaveTimer = null;
         let autosaveInFlight = false;
         let autosaveQueued = false;
@@ -381,6 +396,52 @@
           }
         }
 
+        const filenameFromDisposition = (header, fallback) => {
+          const raw = String(header || "");
+          const utf = raw.match(/filename\*=UTF-8''([^;]+)/i);
+          if (utf) return decodeURIComponent(utf[1].replace(/"/g, ""));
+          const simple = raw.match(/filename="?([^";]+)"?/i);
+          return simple ? simple[1] : fallback;
+        };
+
+        async function downloadArticle(format) {
+          msg("");
+          try {
+            if (autosaveReady) {
+              await waitForAutosaveIdle();
+              if (getDraftSnapshot() !== lastSavedSnapshot) {
+                await persistDraft({ skipLoader: true });
+              }
+            }
+
+            const res = await fetch(`${APP_CONFIG.apiBaseUrl}/api/export/${encodeURIComponent(id)}/${encodeURIComponent(format)}`, {
+              credentials: "include"
+            });
+            if (!res.ok) {
+              const body = await res.json().catch(() => ({}));
+              throw new Error(body.error || `Download failed (${res.status})`);
+            }
+
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filenameFromDisposition(res.headers.get("Content-Disposition"), `article.${format}`);
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            msg(`Downloaded ${format.toUpperCase()}.`);
+          } catch (e) {
+            if (isNetworkError(e)) {
+              markOfflineDraft();
+              msg("Saved locally. Reconnect to download the latest export.");
+            } else {
+              msg(e.message || String(e));
+            }
+          }
+        }
+
         const syncLocalDraft = async () => {
           if (!autosaveReady) return;
           const localDraft = readLocalDraft();
@@ -407,10 +468,12 @@
         document.getElementById("short").disabled = true;
         document.getElementById("save").disabled = true;
         document.getElementById("submit").disabled = true;
+        downloadButtons.forEach((button) => (button.disabled = true));
 
         const list = await APP.apiFetch("/api/articles");
         const article = (list.articles || []).find((a) => a.id === id);
         if (!article) { msg("Article not found."); return; }
+        downloadButtons.forEach((button) => (button.disabled = false));
 
         document.getElementById("title").value = article.title || "";
         document.getElementById("short").value = article.short_description || "";
@@ -491,6 +554,9 @@
           setEditorSpellcheck(spellcheckEnabled);
         });
         copyLongButton.addEventListener("click", copyLongDescription);
+        downloadButtons.forEach((button) => {
+          button.addEventListener("click", () => downloadArticle(button.getAttribute("data-download-format")));
+        });
 
         window.addEventListener("offline", () => {
           if (!autosaveReady) return;

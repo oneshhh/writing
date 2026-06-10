@@ -13,42 +13,63 @@
   </head>
   <body>
     <div class="topbar" id="topbar"></div>
-    <div class="wrap wide">
+    <div class="wrap wide review-page">
       <div class="grid">
-        <div class="card" style="grid-column: span 4">
-          <h2>Submitted Queue</h2>
-          <table>
-            <thead><tr><th>Title</th><th>AI</th><th>Plagiarism</th><th></th></tr></thead>
-            <tbody id="rows"></tbody>
-          </table>
+        <div class="card review-queue-card" id="queueCard">
+          <div class="review-page-head">
+            <div>
+              <h2 style="margin:0">Submitted Queue</h2>
+              <div class="muted" id="queueCount" style="margin-top:6px">Loading articles...</div>
+            </div>
+          </div>
+          <div class="review-queue-list" id="rows"></div>
+          <div class="muted hidden" id="emptyQueue" style="margin-top: 10px">No submitted articles are waiting for review.</div>
         </div>
-        <div class="card" style="grid-column: span 8">
-          <h2>Review</h2>
-          <div class="muted" id="selHint">Select an article from the queue.</div>
-          <div id="panel" class="hidden">
-            <div class="badge" id="status"></div>
-            <h3 id="title" style="margin: 10px 0 0 0"></h3>
-            <div class="muted" id="short"></div>
-            <div style="margin-top: 10px; display:flex; gap:10px; flex-wrap:wrap;">
+
+        <div class="card review-detail-card hidden" id="reviewCard">
+          <div class="review-page-head">
+            <div>
+              <h2 style="margin:0">Review Article</h2>
+              <div class="muted" style="margin-top:6px">Read the full article before approving, rejecting, or sending it back for rework.</div>
+            </div>
+            <a href="/manager/review.html"><button class="secondary" type="button">Back to queue</button></a>
+          </div>
+
+          <div class="review-article-head">
+            <div class="review-title-block">
+              <div class="badge" id="status"></div>
+              <h1 id="title"></h1>
+              <div class="muted review-short" id="short"></div>
+            </div>
+            <div class="review-score-row">
               <span class="pill">AI: <span id="aiScore"></span></span>
               <span class="pill">Plagiarism: <span id="plagScore"></span></span>
               <button class="secondary" id="runChecks" type="button">Run checks</button>
             </div>
-            <div style="margin-top: 10px; border: 1px solid rgba(229,226,225,0.95); border-radius: 18px; padding: 12px; background: rgba(255,255,255,.7)">
-              <div class="muted">Long description</div>
-              <div id="long" style="margin-top: 8px; max-height: 560px; overflow:auto; padding-right:6px"></div>
-            </div>
-            <div style="margin-top: 10px">
-              <label class="muted">Remark (visible to writer)</label>
-              <textarea id="note"></textarea>
-            </div>
-            <div class="right" style="margin-top: 12px">
-              <button class="danger" id="reject">Reject</button>
-              <button class="secondary" id="rework">Rework</button>
-              <button id="approve">Approve</button>
-            </div>
-            <div class="muted" id="msg" style="margin-top: 10px"></div>
           </div>
+
+          <div class="review-long-card">
+            <div class="review-long-head">
+              <div class="muted">Long description</div>
+              <button class="secondary editor-copy-btn" id="copyReviewLong" type="button">
+                <span class="material-symbols-outlined" aria-hidden="true">content_copy</span>
+                Copy long description
+              </button>
+            </div>
+            <div id="long" class="review-long-body"></div>
+          </div>
+
+          <div class="review-note-block">
+            <label class="muted">Remark (visible to writer)</label>
+            <textarea id="note"></textarea>
+          </div>
+
+          <div class="right review-actions">
+            <button class="danger" id="reject">Reject</button>
+            <button class="secondary" id="rework">Rework</button>
+            <button id="approve">Approve</button>
+          </div>
+          <div class="muted" id="msg" style="margin-top: 10px"></div>
         </div>
       </div>
     </div>
@@ -66,26 +87,62 @@
         });
 
         const msg = (t) => (document.getElementById("msg").textContent = t || "");
+        const queueCard = document.getElementById("queueCard");
+        const reviewCard = document.getElementById("reviewCard");
+        const queueRows = document.getElementById("rows");
+        const queueCount = document.getElementById("queueCount");
+        const emptyQueue = document.getElementById("emptyQueue");
         let selected = null;
 
         const params = new URLSearchParams(window.location.search);
         const openId = params.get("id");
 
+        function reviewUrl(id) {
+          return `/manager/review.html?id=${encodeURIComponent(id)}`;
+        }
+
+        function showQueue() {
+          selected = null;
+          queueCard.classList.remove("hidden");
+          reviewCard.classList.add("hidden");
+        }
+
+        function showReview() {
+          queueCard.classList.add("hidden");
+          reviewCard.classList.remove("hidden");
+        }
+
+        function renderQueueSkeleton() {
+          queueRows.innerHTML = Array.from({ length: 4 })
+            .map(
+              () => `<div class="review-queue-item">
+                <div class="rw-skeleton rw-skel-line" style="width:72%;"></div>
+                <div class="rw-skeleton rw-skel-line" style="width:48%;margin-top:12px;"></div>
+              </div>`
+            )
+            .join("");
+        }
+
         async function refresh() {
-          APP.ui.tableSkeleton("rows", { rows: 8, cols: 4 });
+          renderQueueSkeleton();
+          emptyQueue.classList.add("hidden");
           const list = await APP.apiFetch("/api/articles");
           const submitted = (list.articles || []).filter((a) => a.status === "submitted");
-          document.getElementById("rows").innerHTML = submitted
-            .map((a) => `<tr>
-              <td>${APP.escapeHtml(a.title)}</td>
-              <td>${APP.checkBadge(a.ai_score)}</td>
-              <td>${APP.checkBadge(a.plagiarism_score)}</td>
-              <td class="right"><button class="secondary" data-id="${a.id}">Open</button></td>
-            </tr>`)
+          queueCount.textContent = `${submitted.length} article${submitted.length === 1 ? "" : "s"} waiting`;
+          emptyQueue.classList.toggle("hidden", submitted.length !== 0);
+          queueRows.innerHTML = submitted
+            .map(
+              (a) => `<article class="review-queue-item">
+                <div class="review-queue-title">${APP.escapeHtml(a.title || "Untitled")}</div>
+                <div class="muted review-queue-summary">${APP.escapeHtml(a.short_description || "")}</div>
+                <div class="review-queue-meta">
+                  <span class="pill">AI: ${APP.checkBadge(a.ai_score)}</span>
+                  <span class="pill">Plagiarism: ${APP.checkBadge(a.plagiarism_score)}</span>
+                  <a href="${reviewUrl(a.id)}"><button class="secondary" type="button">Open</button></a>
+                </div>
+              </article>`
+            )
             .join("");
-          for (const btn of document.querySelectorAll("button[data-id]")) {
-            btn.onclick = () => open(submitted.find((x) => x.id === btn.getAttribute("data-id")));
-          }
         }
 
         async function openById(id) {
@@ -94,14 +151,20 @@
             const out = await APP.apiFetch(`/api/articles/${encodeURIComponent(id)}`);
             open(out.article);
           } catch (e) {
+            showQueue();
             msg(e.message || String(e));
           }
         }
 
+        function setReviewActionsEnabled(enabled) {
+          document.getElementById("approve").disabled = !enabled;
+          document.getElementById("reject").disabled = !enabled;
+          document.getElementById("rework").disabled = !enabled;
+        }
+
         function open(a) {
           selected = a;
-          document.getElementById("selHint").classList.add("hidden");
-          document.getElementById("panel").classList.remove("hidden");
+          showReview();
           document.getElementById("status").innerHTML = APP.badgeForStatus(a.status);
           document.getElementById("title").textContent = a.title || "";
           document.getElementById("short").textContent = a.short_description || "";
@@ -109,7 +172,35 @@
           document.getElementById("note").value = "";
           document.getElementById("aiScore").innerHTML = APP.checkBadge(a.ai_score);
           document.getElementById("plagScore").innerHTML = APP.checkBadge(a.plagiarism_score);
-          msg("");
+          setReviewActionsEnabled(a.status === "submitted");
+          msg(a.status === "submitted" ? "" : "This article is not currently submitted for review.");
+        }
+
+        async function copyLongDescription() {
+          const text = document.getElementById("long").innerText.trim();
+          if (!text) {
+            msg("Nothing to copy.");
+            return;
+          }
+
+          try {
+            if (navigator.clipboard?.writeText) {
+              await navigator.clipboard.writeText(text);
+            } else {
+              const ta = document.createElement("textarea");
+              ta.value = text;
+              ta.setAttribute("readonly", "");
+              ta.style.position = "fixed";
+              ta.style.opacity = "0";
+              document.body.appendChild(ta);
+              ta.select();
+              document.execCommand("copy");
+              ta.remove();
+            }
+            msg("Long description copied.");
+          } catch (e) {
+            msg("Could not copy. Please select the text and copy manually.");
+          }
         }
 
         async function act(action) {
@@ -128,10 +219,7 @@
                   body: JSON.stringify({ action, manager_note: document.getElementById("note").value })
                 })
             });
-            selected = null;
-            document.getElementById("panel").classList.add("hidden");
-            document.getElementById("selHint").classList.remove("hidden");
-            await refresh();
+            window.location.href = "/manager/review.html";
           } catch (e) {
             msg(e.message || String(e));
           }
@@ -150,7 +238,6 @@
             });
             selected = out.article;
             open(selected);
-            await refresh();
           } catch (e) {
             msg(e.message || String(e));
           }
@@ -159,9 +246,14 @@
         document.getElementById("approve").onclick = () => act("approved");
         document.getElementById("reject").onclick = () => act("rejected");
         document.getElementById("rework").onclick = () => act("rework");
+        document.getElementById("copyReviewLong").onclick = copyLongDescription;
 
-        await refresh();
-        if (openId) await openById(openId);
+        if (openId) {
+          await openById(openId);
+        } else {
+          showQueue();
+          await refresh();
+        }
       })();
     </script>
   </body>
