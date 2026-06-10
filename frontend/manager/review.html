@@ -46,6 +46,20 @@
               <span class="pill">Plagiarism: <span id="plagScore"></span></span>
               <button class="secondary" id="runChecks" type="button">Run checks</button>
             </div>
+            <div class="editor-download-row review-download-row">
+              <button class="secondary editor-download-btn" data-download-format="pdf" type="button">
+                <span class="material-symbols-outlined" aria-hidden="true">picture_as_pdf</span>
+                Download PDF
+              </button>
+              <button class="secondary editor-download-btn" data-download-format="docx" type="button">
+                <span class="material-symbols-outlined" aria-hidden="true">description</span>
+                Download Word
+              </button>
+              <button class="secondary editor-download-btn" data-download-format="txt" type="button">
+                <span class="material-symbols-outlined" aria-hidden="true">article</span>
+                Download TXT
+              </button>
+            </div>
           </div>
 
           <div class="review-long-card">
@@ -176,6 +190,41 @@
           msg(a.status === "submitted" ? "" : "This article is not currently submitted for review.");
         }
 
+        const filenameFromDisposition = (header, fallback) => {
+          const raw = String(header || "");
+          const utf = raw.match(/filename\*=UTF-8''([^;]+)/i);
+          if (utf) return decodeURIComponent(utf[1].replace(/"/g, ""));
+          const simple = raw.match(/filename="?([^";]+)"?/i);
+          return simple ? simple[1] : fallback;
+        };
+
+        async function downloadArticle(format) {
+          msg("");
+          if (!selected) return;
+          try {
+            const res = await fetch(`${APP_CONFIG.apiBaseUrl}/api/export/${encodeURIComponent(selected.id)}/${encodeURIComponent(format)}`, {
+              credentials: "include"
+            });
+            if (!res.ok) {
+              const body = await res.json().catch(() => ({}));
+              throw new Error(body.error || `Download failed (${res.status})`);
+            }
+
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filenameFromDisposition(res.headers.get("Content-Disposition"), `article.${format}`);
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            msg(`Downloaded ${format.toUpperCase()}.`);
+          } catch (e) {
+            msg(e.message || String(e));
+          }
+        }
+
         async function copyLongDescription() {
           const text = document.getElementById("long").innerText.trim();
           if (!text) {
@@ -247,6 +296,9 @@
         document.getElementById("reject").onclick = () => act("rejected");
         document.getElementById("rework").onclick = () => act("rework");
         document.getElementById("copyReviewLong").onclick = copyLongDescription;
+        for (const button of document.querySelectorAll("[data-download-format]")) {
+          button.onclick = () => downloadArticle(button.getAttribute("data-download-format"));
+        }
 
         if (openId) {
           await openById(openId);
