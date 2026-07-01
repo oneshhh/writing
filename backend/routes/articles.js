@@ -4,7 +4,7 @@ const { getSupabaseAdmin } = require("../utils/supabase");
 const { buildArticleUniqueId } = require("../utils/uniqueId");
 const { runAiCheck } = require("../services/aiCheck");
 const { runPlagiarismCheck } = require("../services/plagiarismCheck");
-const { createNotification } = require("../services/notifications");
+const { notifyWriter } = require("../services/writerNotifications");
 
 const router = express.Router();
 
@@ -490,18 +490,31 @@ router.post("/:id/review", authorizeRoles("manager"), async (req, res) => {
       );
   }
 
+  const { data: writer, error: writerErr } = await db
+    .from("users")
+    .select("id,email,full_name")
+    .eq("id", updated.writer_id)
+    .maybeSingle();
+  if (writerErr) return res.status(400).json({ error: writerErr.message });
+
   // Notify writer
   const type =
     action === "approved" ? "article_approved" : action === "rejected" ? "article_rejected" : "article_rework";
-  await createNotification({
-    user_id: updated.writer_id,
+  await notifyWriter({
+    userId: updated.writer_id,
+    email: writer?.email || null,
     type,
     title: `Article ${action}`,
     body:
       action === "approved"
         ? `Your article "${updated.title}" was approved.`
         : `Your article "${updated.title}" was marked as ${action}. ${manager_note ? "Note: " + manager_note : ""}`.trim(),
-    payload: { article_id: updated.id, project_id: updated.project_id }
+    payload: { article_id: updated.id, project_id: updated.project_id },
+    emailSubject: `Real Write: article ${action}`,
+    emailText:
+      action === "approved"
+        ? `Your article "${updated.title}" was approved.`
+        : `Your article "${updated.title}" was marked as ${action}.${manager_note ? ` Note: ${manager_note}` : ""}`
   });
 
   return res.json({ article: updated });

@@ -23,20 +23,19 @@
             </div>
             <div class="right" style="flex-wrap:wrap;">
               <a href="/manager/projects.html"><button class="secondary" type="button">Projects</button></a>
-              <a href="/manager/review.html"><button class="secondary" type="button">Review</button></a>
             </div>
           </div>
         </div>
 
         <div class="card">
-          <h2>This Month</h2>
+          <h2>This Range</h2>
           <div class="row">
             <div class="stat">
-              <div class="pill dot green">Paid this month</div>
+              <div class="pill dot green">Paid</div>
               <div class="n" id="nPaidMonth">0</div>
             </div>
             <div class="stat">
-              <div class="pill dot amber">Pending this month</div>
+              <div class="pill dot amber">Pending</div>
               <div class="n" id="nPendingMonth">0</div>
             </div>
             <div class="stat">
@@ -44,7 +43,22 @@
               <div class="n" id="nPaymentsTotal">0</div>
             </div>
           </div>
-          <div class="muted" style="margin-top: 8px">Current-month totals are based on payment rows created this month.</div>
+          <div class="muted" style="margin-top: 8px">Totals always follow the current filters.</div>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+            <div>
+              <h2 style="margin:0">Payment Trend</h2>
+              <div class="muted" style="margin-top:6px">Monthly paid and pending totals for the exact date range you selected.</div>
+            </div>
+            <div class="right" style="gap:10px;align-items:center;">
+              <span class="pill dot green">Paid</span>
+              <span class="pill dot amber">Pending</span>
+            </div>
+          </div>
+          <div id="trendEmpty" class="muted" style="margin-top:14px;display:none;">No payments match the current filters.</div>
+          <svg id="paymentTrend" viewBox="0 0 860 280" style="width:100%;height:auto;margin-top:14px;display:block;"></svg>
         </div>
 
         <div class="card">
@@ -69,16 +83,23 @@
               <input id="to" type="date" />
             </div>
           </div>
-          <div class="right" style="margin: 0 0 12px 0; flex-wrap: wrap;">
-            <button class="secondary" id="prevMonth" type="button">←</button>
-            <span class="pill" id="monthLabel">This month</span>
-            <button class="secondary" id="nextMonth" type="button">→</button>
-            <button class="secondary" id="apply" type="button">Apply</button>
-            <button class="secondary" id="clear" type="button">Reset</button>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin: 0 0 12px 0;">
+            <div class="right" style="flex-wrap: wrap;">
+              <button class="secondary" id="prevMonth" type="button">←</button>
+              <span class="pill" id="monthLabel">This month</span>
+              <button class="secondary" id="nextMonth" type="button">→</button>
+              <button class="secondary" id="apply" type="button">Apply</button>
+              <button class="secondary" id="clear" type="button">Reset</button>
+            </div>
+            <div class="right" style="flex-wrap:wrap;">
+              <span class="muted" id="selectedInfo">0 selected</span>
+              <button class="secondary" id="bulkPay" type="button" disabled>Mark selected paid</button>
+            </div>
           </div>
           <table>
             <thead>
               <tr>
+                <th style="width:44px"><input id="selectAll" type="checkbox" aria-label="Select all pending payments on this page" /></th>
                 <th>Article</th>
                 <th>Writer</th>
                 <th>Amount</th>
@@ -104,7 +125,7 @@
       id="payModal"
       style="border:1px solid rgba(229,226,225,0.95);border-radius:24px;background:rgba(255,255,255,0.9);color:var(--rw-text);padding:16px;max-width:520px;width:95%;box-shadow:var(--rw-shadow)"
     >
-      <h3 style="margin:0 0 10px 0">Mark paid</h3>
+      <h3 id="payModalTitle" style="margin:0 0 10px 0">Mark paid</h3>
       <div class="muted" id="payFor"></div>
       <div style="margin-top:10px">
         <label class="muted">Payment ID (optional)</label>
@@ -147,24 +168,26 @@
         const pageSize = 20;
         let offset = 0;
         let total = null;
-        let currentPayment = null;
-        let pageCache = [];
+        let currentPayments = [];
         let currentMonth = new Date();
         let projectId = "";
         let writerId = "";
+        let selection = new Set();
+        let modalPaymentIds = [];
 
-        const startOfMonth = () => {
-          const d = new Date();
-          return new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
+        const money = (value) => `₹${Number(value || 0).toFixed(0)}`;
+        const formatMonth = (month) => {
+          const [year, mm] = String(month || "").split("-");
+          const date = new Date(Number(year), Number(mm || 1) - 1, 1);
+          return date.toLocaleString(undefined, { month: "short", year: "numeric" });
         };
-        const inThisMonth = (iso) => {
-          if (!iso) return false;
-          return new Date(iso).getTime() >= startOfMonth().getTime();
-        };
-        const sum = (rows) => rows.reduce((a, p) => a + Number(p.amount || 0), 0);
 
-        async function refreshStats() {
+        function buildQs({ includePaging } = { includePaging: true }) {
           const qs = new URLSearchParams();
+          if (includePaging) {
+            qs.set("limit", String(pageSize));
+            qs.set("offset", String(offset));
+          }
           if (projectId) qs.set("project_id", projectId);
           if (writerId) qs.set("writer_id", writerId);
 
@@ -176,39 +199,132 @@
             d.setDate(d.getDate() + 1);
             qs.set("to", d.toISOString());
           }
+          return qs;
+        }
 
-          const out = await APP.apiFetch(`/api/payments/stats?${qs.toString()}`);
-          document.getElementById("nPaidMonth").textContent = `₹${Number(out.paid_amount || 0).toFixed(0)}`;
-          document.getElementById("nPendingMonth").textContent = `₹${Number(out.pending_amount || 0).toFixed(0)}`;
+        function setMonth(d) {
+          currentMonth = new Date(d.getFullYear(), d.getMonth(), 1);
+          const from = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+          const to = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+          const pad = (n) => String(n).padStart(2, "0");
+          document.getElementById("from").value = `${from.getFullYear()}-${pad(from.getMonth() + 1)}-${pad(from.getDate())}`;
+          document.getElementById("to").value = `${to.getFullYear()}-${pad(to.getMonth() + 1)}-${pad(to.getDate())}`;
+          document.getElementById("monthLabel").textContent = from.toLocaleString(undefined, { month: "long", year: "numeric" });
+        }
+
+        function syncSelectionUi() {
+          const count = selection.size;
+          document.getElementById("selectedInfo").textContent = `${count} selected`;
+          document.getElementById("bulkPay").disabled = count === 0;
+
+          const selectableIds = currentPayments.filter((p) => p.status === "pending").map((p) => p.id);
+          const selectedOnPage = selectableIds.filter((id) => selection.has(id)).length;
+          const selectAll = document.getElementById("selectAll");
+          selectAll.checked = Boolean(selectableIds.length) && selectedOnPage === selectableIds.length;
+          selectAll.indeterminate = selectedOnPage > 0 && selectedOnPage < selectableIds.length;
+        }
+
+        function renderTrend(months) {
+          const svg = document.getElementById("paymentTrend");
+          const empty = document.getElementById("trendEmpty");
+          const rows = months || [];
+          if (!rows.length || rows.every((row) => Number(row.total_amount || 0) === 0)) {
+            svg.innerHTML = "";
+            empty.style.display = "block";
+            return;
+          }
+
+          empty.style.display = "none";
+          const width = 860;
+          const height = 280;
+          const padX = 52;
+          const padY = 28;
+          const graphW = width - padX * 2;
+          const graphH = height - padY * 2 - 22;
+          const maxValue = Math.max(...rows.map((row) => Math.max(Number(row.paid_amount || 0), Number(row.pending_amount || 0))), 1);
+          const xAt = (index) => padX + (rows.length === 1 ? graphW / 2 : (graphW / (rows.length - 1)) * index);
+          const yAt = (value) => padY + graphH - (Number(value || 0) / maxValue) * graphH;
+          const paidPoints = rows.map((row, index) => `${xAt(index)},${yAt(row.paid_amount)}`).join(" ");
+          const pendingPoints = rows.map((row, index) => `${xAt(index)},${yAt(row.pending_amount)}`).join(" ");
+          const yTicks = 4;
+          const grid = Array.from({ length: yTicks + 1 }).map((_, index) => {
+            const value = (maxValue / yTicks) * index;
+            const y = yAt(value);
+            return `
+              <line x1="${padX}" y1="${y}" x2="${width - padX}" y2="${y}" stroke="rgba(53,44,40,0.12)" stroke-width="1" />
+              <text x="${padX - 10}" y="${y + 4}" text-anchor="end" fill="rgba(91,77,70,0.82)" font-size="11">${money(value)}</text>
+            `;
+          });
+          const xLabels = rows.map((row, index) => {
+            const x = xAt(index);
+            return `<text x="${x}" y="${height - 8}" text-anchor="middle" fill="rgba(91,77,70,0.82)" font-size="11">${APP.escapeHtml(formatMonth(row.month))}</text>`;
+          });
+          const paidDots = rows
+            .map((row, index) => `<circle cx="${xAt(index)}" cy="${yAt(row.paid_amount)}" r="4" fill="#476459"></circle>`)
+            .join("");
+          const pendingDots = rows
+            .map((row, index) => `<circle cx="${xAt(index)}" cy="${yAt(row.pending_amount)}" r="4" fill="#c18a2d"></circle>`)
+            .join("");
+
+          svg.innerHTML = `
+            <rect x="0" y="0" width="${width}" height="${height}" rx="24" fill="rgba(251,248,245,0.85)"></rect>
+            ${grid.join("")}
+            <polyline fill="none" stroke="#476459" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points="${paidPoints}"></polyline>
+            <polyline fill="none" stroke="#c18a2d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points="${pendingPoints}"></polyline>
+            ${paidDots}
+            ${pendingDots}
+            ${xLabels.join("")}
+          `;
+        }
+
+        async function refreshStats() {
+          const out = await APP.apiFetch(`/api/payments/stats?${buildQs({ includePaging: false }).toString()}`);
+          document.getElementById("nPaidMonth").textContent = money(out.paid_amount || 0);
+          document.getElementById("nPendingMonth").textContent = money(out.pending_amount || 0);
           document.getElementById("nPaymentsTotal").textContent = String(out.payments_count ?? 0);
         }
 
+        async function refreshTrend() {
+          const out = await APP.apiFetch(`/api/payments/stats/monthly?${buildQs({ includePaging: false }).toString()}`);
+          renderTrend(out.months || []);
+        }
+
+        function openPayModal(paymentIds) {
+          modalPaymentIds = paymentIds.slice();
+          document.getElementById("paymentId").value = "";
+          document.getElementById("proof").value = "";
+          document.getElementById("payModalTitle").textContent = modalPaymentIds.length > 1 ? "Mark selected paid" : "Mark paid";
+          if (modalPaymentIds.length > 1) {
+            document.getElementById("payFor").textContent = `${modalPaymentIds.length} payments selected`;
+          } else {
+            const payment = currentPayments.find((item) => item.id === modalPaymentIds[0]);
+            document.getElementById("payFor").textContent = `Payment for ${payment?.articles?.title || "article"} (${money(payment?.amount || 0)})`;
+          }
+          modalMsg("");
+          modal.showModal();
+        }
+
         function renderRows(rows) {
-          pageCache = rows || [];
-          document.getElementById("rows").innerHTML = (rows || [])
+          currentPayments = rows || [];
+          document.getElementById("rows").innerHTML = currentPayments
             .map((p) => {
-              const a = p.articles;
-              const u = p.writer;
-              const title = a?.title || "Article";
-              const uid = a?.unique_id || p.article_id;
-              const aStatus = a?.status || "-";
-              const writer = u?.full_name || "Writer";
-              const email = u?.email || "";
+              const article = p.articles;
+              const writer = p.writer;
+              const checked = selection.has(p.id) ? "checked" : "";
               return `<tr>
-                <td>
-                  <a href="/manager/review.html?id=${encodeURIComponent(p.article_id)}" style="font-weight:800;color:var(--rw-text);text-decoration:none;">${APP.escapeHtml(title)}</a>
-                  <div class="muted">${APP.escapeHtml(uid)} • ${APP.escapeHtml(aStatus)}</div>
+                <td class="right">
+                  ${p.status === "pending" ? `<input type="checkbox" data-select="${p.id}" ${checked} aria-label="Select payment" />` : ""}
                 </td>
                 <td>
-                  <div style="font-weight:750">${APP.escapeHtml(writer)}</div>
-                  <div class="muted">${APP.escapeHtml(email)}</div>
+                  <a href="/manager/review.html?id=${encodeURIComponent(p.article_id)}" style="font-weight:800;color:var(--rw-text);text-decoration:none;">${APP.escapeHtml(article?.title || "Article")}</a>
+                  <div class="muted">${APP.escapeHtml(article?.unique_id || p.article_id)} • ${APP.escapeHtml(article?.status || "-")}</div>
                 </td>
-                <td>₹${APP.escapeHtml(Number(p.amount || 0).toFixed(0))}</td>
-                <td>${
-                  p.status === "paid"
-                    ? "<span class='badge b-approved'>paid</span>"
-                    : "<span class='badge b-submitted'>pending</span>"
-                }</td>
+                <td>
+                  <div style="font-weight:750">${APP.escapeHtml(writer?.full_name || "Writer")}</div>
+                  <div class="muted">${APP.escapeHtml(writer?.email || "")}</div>
+                </td>
+                <td>${money(p.amount || 0)}</td>
+                <td>${p.status === "paid" ? "<span class='badge b-approved'>paid</span>" : "<span class='badge b-submitted'>pending</span>"}</td>
                 <td class="muted">${APP.escapeHtml(new Date(p.created_at).toLocaleString())}</td>
                 <td class="muted">${p.paid_at ? APP.escapeHtml(new Date(p.paid_at).toLocaleString()) : "-"}</td>
                 <td class="right">
@@ -224,17 +340,20 @@
             })
             .join("");
 
-          for (const btn of document.querySelectorAll("button[data-pay]")) {
-            btn.onclick = () => {
-              const id = btn.getAttribute("data-pay");
-              currentPayment = pageCache.find((x) => x.id === id);
-              document.getElementById("paymentId").value = "";
-              document.getElementById("proof").value = "";
-              document.getElementById("payFor").textContent = `Payment for ${currentPayment?.articles?.title || "article"} (₹${currentPayment.amount})`;
-              modalMsg("");
-              modal.showModal();
+          for (const input of document.querySelectorAll("input[data-select]")) {
+            input.onchange = () => {
+              const id = input.getAttribute("data-select");
+              if (input.checked) selection.add(id);
+              else selection.delete(id);
+              syncSelectionUi();
             };
           }
+
+          for (const btn of document.querySelectorAll("button[data-pay]")) {
+            btn.onclick = () => openPayModal([btn.getAttribute("data-pay")]);
+          }
+
+          syncSelectionUi();
         }
 
         function updatePager() {
@@ -246,69 +365,15 @@
         }
 
         async function loadPage() {
-          APP.ui.tableSkeleton("rows", { rows: 10, cols: 7 });
-          const qs = new URLSearchParams();
-          qs.set("limit", String(pageSize));
-          qs.set("offset", String(offset));
-          if (projectId) qs.set("project_id", projectId);
-          if (writerId) qs.set("writer_id", writerId);
-
-          const fromVal = document.getElementById("from").value;
-          const toVal = document.getElementById("to").value;
-          if (fromVal) qs.set("from", new Date(fromVal + "T00:00:00").toISOString());
-          // treat `to` as exclusive: next day 00:00
-          if (toVal) {
-            const d = new Date(toVal + "T00:00:00");
-            d.setDate(d.getDate() + 1);
-            qs.set("to", d.toISOString());
-          }
-
-          const out = await APP.apiFetch(`/api/payments?${qs.toString()}`);
+          APP.ui.tableSkeleton("rows", { rows: 10, cols: 8 });
+          const out = await APP.apiFetch(`/api/payments?${buildQs({ includePaging: true }).toString()}`);
           total = out.total ?? total;
           renderRows(out.payments || []);
           updatePager();
         }
 
-        document.getElementById("confirm").onclick = async () => {
-          modalMsg("");
-          try {
-            const fd = new FormData();
-            fd.append("payment_id", document.getElementById("paymentId").value);
-            const file = document.getElementById("proof").files[0];
-            if (file) fd.append("proof", file);
-
-            const res = await fetch(`${APP_CONFIG.apiBaseUrl}/api/payments/${encodeURIComponent(currentPayment.id)}/pay`, {
-              method: "PATCH",
-              body: fd,
-              credentials: "include"
-            });
-            const body = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(body.error || "Failed");
-            modal.close();
-            await loadPage();
-            msg("Marked paid.");
-          } catch (e) {
-            modalMsg(e.message || String(e));
-          }
-        };
-
-        document.getElementById("prev").onclick = async () => {
-          offset = Math.max(0, offset - pageSize);
-          await loadPage();
-        };
-        document.getElementById("next").onclick = async () => {
-          offset = offset + pageSize;
-          await loadPage();
-        };
-
-        function setMonth(d) {
-          currentMonth = new Date(d.getFullYear(), d.getMonth(), 1);
-          const from = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
-          const to = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
-          const pad = (n) => String(n).padStart(2, "0");
-          document.getElementById("from").value = `${from.getFullYear()}-${pad(from.getMonth() + 1)}-${pad(from.getDate())}`;
-          document.getElementById("to").value = `${to.getFullYear()}-${pad(to.getMonth() + 1)}-${pad(to.getDate())}`;
-          document.getElementById("monthLabel").textContent = from.toLocaleString(undefined, { month: "long", year: "numeric" });
+        async function refreshAll() {
+          await Promise.all([refreshStats(), refreshTrend(), loadPage()]);
         }
 
         async function loadProjects() {
@@ -336,68 +401,116 @@
               writers.map((w) => {
                 const name = w.users?.full_name || "Writer";
                 const email = w.users?.email || "";
-                return `<option value="${w.writer_id}">${APP.escapeHtml(name)}${email ? " (" + APP.escapeHtml(email) + ")" : ""}</option>`;
+                return `<option value="${w.writer_id}">${APP.escapeHtml(name)}${email ? ` (${APP.escapeHtml(email)})` : ""}</option>`;
               })
             )
             .join("");
           sel.disabled = false;
         }
 
+        document.getElementById("selectAll").onchange = (event) => {
+          const checked = event.target.checked;
+          for (const payment of currentPayments.filter((row) => row.status === "pending")) {
+            if (checked) selection.add(payment.id);
+            else selection.delete(payment.id);
+          }
+          renderRows(currentPayments);
+        };
+
+        document.getElementById("bulkPay").onclick = () => openPayModal(Array.from(selection));
+
+        document.getElementById("confirm").onclick = async () => {
+          modalMsg("");
+          try {
+            const fd = new FormData();
+            fd.append("payment_id", document.getElementById("paymentId").value);
+            const file = document.getElementById("proof").files[0];
+            if (file) fd.append("proof", file);
+
+            let url;
+            if (modalPaymentIds.length > 1) {
+              fd.append("payment_ids", modalPaymentIds.join(","));
+              url = `${APP_CONFIG.apiBaseUrl}/api/payments/bulk-pay`;
+            } else {
+              url = `${APP_CONFIG.apiBaseUrl}/api/payments/${encodeURIComponent(modalPaymentIds[0])}/pay`;
+            }
+
+            const res = await fetch(url, { method: "PATCH", body: fd, credentials: "include" });
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(body.error || "Failed");
+
+            for (const id of modalPaymentIds) selection.delete(id);
+            modal.close();
+            await refreshAll();
+            msg(modalPaymentIds.length > 1 ? "Selected payments marked as paid." : "Marked paid.");
+          } catch (e) {
+            modalMsg(e.message || String(e));
+          }
+        };
+
+        document.getElementById("prev").onclick = async () => {
+          offset = Math.max(0, offset - pageSize);
+          await loadPage();
+        };
+        document.getElementById("next").onclick = async () => {
+          offset += pageSize;
+          await loadPage();
+        };
+
         document.getElementById("project").onchange = async (e) => {
           projectId = e.target.value || "";
           writerId = "";
+          selection.clear();
           document.getElementById("writer").value = "";
           await loadWritersForProject(projectId);
           offset = 0;
-          await refreshStats();
-          await loadPage();
+          await refreshAll();
         };
 
         document.getElementById("writer").onchange = async (e) => {
           writerId = e.target.value || "";
+          selection.clear();
           offset = 0;
-          await refreshStats();
-          await loadPage();
+          await refreshAll();
         };
 
         document.getElementById("apply").onclick = async () => {
+          selection.clear();
           offset = 0;
-          await refreshStats();
-          await loadPage();
+          await refreshAll();
         };
         document.getElementById("clear").onclick = async () => {
           projectId = "";
           writerId = "";
+          selection.clear();
           document.getElementById("project").value = "";
           await loadWritersForProject("");
           setMonth(new Date());
           offset = 0;
-          await refreshStats();
-          await loadPage();
+          await refreshAll();
         };
         document.getElementById("prevMonth").onclick = async () => {
           const d = new Date(currentMonth);
           d.setMonth(d.getMonth() - 1);
+          selection.clear();
           setMonth(d);
           offset = 0;
-          await refreshStats();
-          await loadPage();
+          await refreshAll();
         };
         document.getElementById("nextMonth").onclick = async () => {
           const d = new Date(currentMonth);
           d.setMonth(d.getMonth() + 1);
+          selection.clear();
           setMonth(d);
           offset = 0;
-          await refreshStats();
-          await loadPage();
+          await refreshAll();
         };
 
         try {
           await loadProjects();
           await loadWritersForProject("");
           setMonth(new Date());
-          await refreshStats();
-          await loadPage();
+          await refreshAll();
         } catch (e) {
           msg(e.message || String(e));
         }

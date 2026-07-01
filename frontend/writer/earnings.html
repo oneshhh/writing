@@ -79,6 +79,7 @@
         const pageSize = 20;
         let offset = 0;
         let total = null;
+        const requestedPaymentId = new URLSearchParams(window.location.search).get("payment");
 
         const startOfMonth = () => {
           const d = new Date();
@@ -111,7 +112,7 @@
               const title = a?.title || "Article";
               const uid = a?.unique_id || p.article_id;
               const status = a?.status || "-";
-              return `<tr>
+              return `<tr data-payment-row="${p.id}">
                 <td data-label="Article">
                   <div style="font-weight:750">${APP.escapeHtml(title)}</div>
                   <div class="muted">${APP.escapeHtml(uid)} • ${APP.escapeHtml(status)}</div>
@@ -127,6 +128,14 @@
               </tr>`;
             })
             .join("");
+          if (requestedPaymentId) {
+            const row = document.querySelector(`[data-payment-row="${requestedPaymentId}"]`);
+            if (row) {
+              row.style.outline = "2px solid rgba(196,90,43,0.45)";
+              row.style.outlineOffset = "-2px";
+              row.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+          }
         }
 
         function updatePager() {

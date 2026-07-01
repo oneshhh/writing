@@ -18,7 +18,7 @@
         <div class="card">
           <h2>Inbox</h2>
           <table>
-            <thead><tr><th>Title</th><th>Body</th><th>When</th><th></th></tr></thead>
+            <thead><tr><th>Title</th><th>Body</th><th>When</th><th></th><th></th></tr></thead>
             <tbody id="rows"></tbody>
           </table>
         </div>
@@ -30,21 +30,51 @@
         if (!user) return;
         await renderTopbar({ role: user.role, links: [{ href: `/${user.role}/dashboard.html`, label: "Dashboard" }] });
 
+        function notificationHref(n) {
+          const articleId = n?.payload?.article_id;
+          const paymentId = n?.payload?.payment_id;
+          if (String(n?.type || "").startsWith("payment")) {
+            return user.role === "writer" ? `/writer/earnings.html?payment=${encodeURIComponent(paymentId || "")}` : null;
+          }
+          if (String(n?.type || "").startsWith("article_") && articleId) {
+            return user.role === "writer" ? `/writer/dashboard.html?article=${encodeURIComponent(articleId)}` : null;
+          }
+          return null;
+        }
+
+        async function markRead(id) {
+          await APP.apiFetch(`/api/notifications/${encodeURIComponent(id)}/read`, { method: "PATCH" });
+        }
+
         async function refresh() {
-          APP.ui.tableSkeleton("rows", { rows: 10, cols: 4 });
+          APP.ui.tableSkeleton("rows", { rows: 10, cols: 5 });
           const data = await APP.apiFetch("/api/notifications");
           document.getElementById("rows").innerHTML = (data.notifications || [])
-            .map((n) => `<tr>
+            .map((n) => {
+              const href = notificationHref(n);
+              return `<tr>
               <td>${n.read ? "<span class='badge b-draft'>read</span>" : "<span class='badge b-submitted'>new</span>"} ${APP.escapeHtml(n.title)}</td>
               <td class="muted">${APP.escapeHtml(n.body)}</td>
               <td class="muted">${APP.escapeHtml(new Date(n.created_at).toLocaleString())}</td>
+              <td class="right">${href ? `<a href="${href}" data-open="${n.id}" data-href="${href}"><button type="button">Open</button></a>` : ""}</td>
               <td class="right">${n.read ? "" : `<button class="secondary" data-read="${n.id}">Mark read</button>`}</td>
-            </tr>`)
+            </tr>`;
+            })
             .join("");
           for (const b of document.querySelectorAll("button[data-read]")) {
             b.onclick = async () => {
-              await APP.apiFetch(`/api/notifications/${encodeURIComponent(b.getAttribute("data-read"))}/read`, { method: "PATCH" });
+              await markRead(b.getAttribute("data-read"));
               await refresh();
+            };
+          }
+          for (const link of document.querySelectorAll("a[data-open]")) {
+            link.onclick = async (event) => {
+              event.preventDefault();
+              const href = link.getAttribute("data-href");
+              try {
+                await markRead(link.getAttribute("data-open"));
+              } catch (_err) {}
+              if (href) window.location.href = href;
             };
           }
         }

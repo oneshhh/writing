@@ -63,6 +63,7 @@ async function renderTopbar({ role, links }) {
           <a href="${l.href}" class="${isActive(l.href) ? "active" : ""}">
             <span class="material-symbols-outlined" aria-hidden="true">${l.icon}</span>
             <span>${APP.escapeHtml(l.label)}</span>
+            ${l.href === "/shared/notifications.html" ? `<span class="rw-nav-pill hidden" id="rwNotificationCount"></span>` : ""}
           </a>
         `
           )
@@ -131,6 +132,25 @@ async function renderTopbar({ role, links }) {
 
   for (const a of bar.querySelectorAll(".rw-nav a")) {
     a.addEventListener("click", () => document.body.classList.remove("rw-sidebar-open"));
+  }
+
+  const unreadBadge = document.getElementById("rwNotificationCount");
+  if (role && unreadBadge) {
+    APP.apiFetch("/api/notifications", { skipLoader: true })
+      .then((data) => {
+        const unread = (data.notifications || []).filter((item) => !item.read).length;
+        if (unread > 0) {
+          unreadBadge.textContent = unread > 99 ? "99+" : String(unread);
+          unreadBadge.classList.remove("hidden");
+          unreadBadge.style.cssText =
+            "margin-left:auto;min-width:22px;height:22px;padding:0 7px;border-radius:999px;background:#c45a2b;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;";
+        } else {
+          unreadBadge.classList.add("hidden");
+        }
+      })
+      .catch(() => {
+        unreadBadge.classList.add("hidden");
+      });
   }
 
   if (role) document.title = `${String(role).toUpperCase()} \u2022 ${pageTitle || rawTitle}`;

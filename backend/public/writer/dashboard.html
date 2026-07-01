@@ -87,13 +87,23 @@
         let offset = 0;
         let total = null;
         let projectName = new Map();
+        const requestedArticleId = new URLSearchParams(window.location.search).get("article");
+
+        function focusRequestedArticle() {
+          if (!requestedArticleId) return;
+          const row = document.querySelector(`[data-article-row="${requestedArticleId}"]`);
+          if (!row) return;
+          row.style.outline = "2px solid rgba(196,90,43,0.45)";
+          row.style.outlineOffset = "-2px";
+          row.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
 
         function renderRows(rows) {
           document.getElementById("rows").innerHTML = (rows || [])
             .map((a) => {
               const canEdit = a.status === "draft" || a.status === "rework";
               return `
-                <tr>
+                <tr data-article-row="${a.id}">
                   <td data-label="Title">${APP.escapeHtml(a.title)}</td>
                   <td class="muted" data-label="Project">${APP.escapeHtml(projectName.get(a.project_id) || a.project_id)}</td>
                   <td data-label="Status">${APP.badgeForStatus(a.status)}</td>
@@ -107,6 +117,7 @@
                 </tr>`;
             })
             .join("");
+          focusRequestedArticle();
         }
 
         function updatePager() {

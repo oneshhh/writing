@@ -2,7 +2,7 @@ const express = require("express");
 const multer = require("multer");
 const { authorizeRoles } = require("../middleware/authorize");
 const { getSupabaseAdmin } = require("../utils/supabase");
-const { createNotification } = require("../services/notifications");
+const { notifyWriter } = require("../services/writerNotifications");
 
 const upload = multer({ storage: multer.memoryStorage() });
 const router = express.Router();
@@ -27,6 +27,110 @@ function applyDateFilters(q, { fromFilter, toFilter }) {
   return q;
 }
 
+function normalizeIso(input) {
+  if (!input) return null;
+  const date = new Date(String(input));
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function buildMonthlyBuckets({ fromIso, toIso }) {
+  const now = new Date();
+  const fallbackStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 5, 1, 0, 0, 0));
+  const safeEnd = toIso ? new Date(toIso) : new Date();
+  const safeStart = fromIso ? new Date(fromIso) : fallbackStart;
+  const start = new Date(Date.UTC(safeStart.getUTCFullYear(), safeStart.getUTCMonth(), 1, 0, 0, 0));
+  const end = new Date(Date.UTC(safeEnd.getUTCFullYear(), safeEnd.getUTCMonth(), 1, 0, 0, 0));
+  if (start > end) return [];
+
+  const months = [];
+  const cursor = new Date(start);
+  while (cursor <= end) {
+    months.push(cursor.toISOString().slice(0, 7));
+    cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+  }
+  return months;
+}
+
+function summarizeMonthlyPayments(rows, monthKeys) {
+  const bucketMap = new Map(
+    monthKeys.map((month) => [
+      month,
+      { month, paid_amount: 0, pending_amount: 0, total_amount: 0, payments_count: 0 }
+    ])
+  );
+
+  for (const row of rows || []) {
+    const month = String(row.created_at || "").slice(0, 7);
+    if (!bucketMap.has(month)) continue;
+    const bucket = bucketMap.get(month);
+    const amount = Number(row.amount || 0);
+    const safeAmount = Number.isFinite(amount) ? amount : 0;
+    bucket.total_amount += safeAmount;
+    bucket.payments_count += 1;
+    if (row.status === "paid") bucket.paid_amount += safeAmount;
+    if (row.status === "pending") bucket.pending_amount += safeAmount;
+  }
+
+  return monthKeys.map((month) => bucketMap.get(month));
+}
+
+async function uploadProofFile(db, payment, file) {
+  if (!file) return payment.proof_url || null;
+  const bucket = "payment-proofs";
+  const path = `${payment.writer_id}/${payment.article_id}/${Date.now()}_${file.originalname}`;
+  const { error: upErr } = await db.storage.from(bucket).upload(path, file.buffer, {
+    contentType: file.mimetype,
+    upsert: true
+  });
+  if (upErr) throw new Error(upErr.message);
+  const { data: pub } = db.storage.from(bucket).getPublicUrl(path);
+  return pub?.publicUrl || null;
+}
+
+async function verifyPaymentAccess(db, payment, user) {
+  if (user.role === "admin") return;
+  const { data: project, error: pErr } = await db.from("projects").select("created_by").eq("id", payment.project_id).single();
+  if (pErr) throw new Error(pErr.message);
+  if (project.created_by !== user.id) {
+    const err = new Error("Forbidden");
+    err.status = 403;
+    throw err;
+  }
+}
+
+async function markPaymentPaid({ db, payment, actor, paymentId, proofUrl }) {
+  const patch = {
+    status: "paid",
+    payment_id: paymentId || null,
+    proof_url: proofUrl || payment.proof_url || null,
+    paid_by: actor.id,
+    paid_at: new Date().toISOString()
+  };
+
+  const { data: updated, error } = await db.from("payments").update(patch).eq("id", payment.id).select("*").single();
+  if (error) throw new Error(error.message);
+
+  const { data: writer, error: writerErr } = await db
+    .from("users")
+    .select("id,email,full_name")
+    .eq("id", updated.writer_id)
+    .maybeSingle();
+  if (writerErr) throw new Error(writerErr.message);
+
+  await notifyWriter({
+    userId: updated.writer_id,
+    email: writer?.email || null,
+    type: "payment_received",
+    title: "Payment approved",
+    body: `Your payment has been approved for ${payment.articles?.title || "your article"}.`,
+    payload: { payment_id: updated.id, article_id: updated.article_id, project_id: updated.project_id },
+    emailSubject: "Real Write: payment approved",
+    emailText: `Your payment has been approved for ${payment.articles?.title || "your article"}.${updated.payment_id ? ` Payment ID: ${updated.payment_id}` : ""}`
+  });
+
+  return updated;
+}
+
 router.get("/stats", authorizeRoles("writer", "manager", "admin"), async (req, res) => {
   const db = getSupabaseAdmin();
   const user = req.auth.user;
@@ -43,9 +147,8 @@ router.get("/stats", authorizeRoles("writer", "manager", "admin"), async (req, r
       if (projectIdFilter && !projectIds.includes(projectIdFilter)) return res.status(403).json({ error: "Forbidden" });
       q = q.in("project_id", projectIds);
       if (projectIdFilter) q = q.eq("project_id", projectIdFilter);
-    } else {
-      // admin: no project restriction
-      if (projectIdFilter) q = q.eq("project_id", projectIdFilter);
+    } else if (projectIdFilter) {
+      q = q.eq("project_id", projectIdFilter);
     }
 
     if (writerIdFilter) q = q.eq("writer_id", writerIdFilter);
@@ -66,6 +169,42 @@ router.get("/stats", authorizeRoles("writer", "manager", "admin"), async (req, r
     return res.json({ paid_amount, pending_amount, payments_count: (data || []).length });
   } catch (e) {
     return res.status(400).json({ error: e.message || String(e) });
+  }
+});
+
+router.get("/stats/monthly", authorizeRoles("writer", "manager", "admin"), async (req, res) => {
+  const db = getSupabaseAdmin();
+  const user = req.auth.user;
+  const { projectIdFilter, writerIdFilter, fromFilter, toFilter } = parseCommonFilters(req);
+  const fromIso = normalizeIso(fromFilter);
+  const toIso = normalizeIso(toFilter);
+  const monthKeys = buildMonthlyBuckets({ fromIso, toIso });
+  if (!monthKeys.length) return res.json({ months: [] });
+
+  try {
+    let q = db.from("payments").select("amount,status,created_at,project_id,writer_id");
+
+    if (user.role === "writer") {
+      q = q.eq("writer_id", user.id);
+    } else if (user.role === "manager") {
+      const projectIds = await getManagerProjectIds(db, user.id);
+      if (!projectIds.length) return res.json({ months: summarizeMonthlyPayments([], monthKeys) });
+      if (projectIdFilter && !projectIds.includes(projectIdFilter)) return res.status(403).json({ error: "Forbidden" });
+      q = q.in("project_id", projectIds);
+      if (projectIdFilter) q = q.eq("project_id", projectIdFilter);
+    } else if (projectIdFilter) {
+      q = q.eq("project_id", projectIdFilter);
+    }
+
+    if (writerIdFilter) q = q.eq("writer_id", writerIdFilter);
+    q = applyDateFilters(q, { fromFilter: fromIso, toFilter: toIso });
+
+    const { data, error } = await q.order("created_at", { ascending: true });
+    if (error) return res.status(400).json({ error: error.message });
+
+    return res.json({ months: summarizeMonthlyPayments(data || [], monthKeys) });
+  } catch (e) {
+    return res.status(e.status || 400).json({ error: e.message || String(e) });
   }
 });
 
@@ -137,7 +276,7 @@ router.get("/", async (req, res) => {
     if (usePaging) q = q.range(rangeFrom, rangeTo);
     const { data, error, count } = await q;
     if (error) return res.status(400).json({ error: error.message });
-    // Hydrate writer info (name/email) for this page
+
     const writerIds = Array.from(new Set((data || []).map((p) => p.writer_id).filter(Boolean)));
     let writerMap = new Map();
     if (writerIds.length) {
@@ -160,7 +299,6 @@ router.get("/", async (req, res) => {
   const { data, error, count } = await q;
   if (error) return res.status(400).json({ error: error.message });
 
-  // Admin: hydrate writer info too
   const writerIds = Array.from(new Set((data || []).map((p) => p.writer_id).filter(Boolean)));
   let writerMap = new Map();
   if (writerIds.length) {
@@ -198,53 +336,81 @@ router.get("/summary", authorizeRoles("manager"), async (req, res) => {
   return res.json({ by_writer });
 });
 
-router.patch("/:id/pay", authorizeRoles("manager"), upload.single("proof"), async (req, res) => {
+router.patch("/bulk-pay", authorizeRoles("manager", "admin"), upload.single("proof"), async (req, res) => {
+  const ids = Array.isArray(req.body?.payment_ids)
+    ? req.body.payment_ids
+    : String(req.body?.payment_ids || "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+  const uniqueIds = Array.from(new Set(ids));
+  if (!uniqueIds.length) return res.status(400).json({ error: "payment_ids is required" });
+
+  const db = getSupabaseAdmin();
+  const { data: payments, error } = await db
+    .from("payments")
+    .select("*,articles(id,title,unique_id,status)")
+    .in("id", uniqueIds);
+  if (error) return res.status(400).json({ error: error.message });
+  if ((payments || []).length !== uniqueIds.length) return res.status(404).json({ error: "One or more payments were not found" });
+
+  try {
+    for (const payment of payments || []) {
+      if (payment.status === "paid") {
+        const err = new Error("Only pending payments can be marked as paid");
+        err.status = 400;
+        throw err;
+      }
+      await verifyPaymentAccess(db, payment, req.auth.user);
+    }
+
+    const proofUrl = req.file ? await uploadProofFile(db, payments[0], req.file) : null;
+    const updated = [];
+    for (const payment of payments || []) {
+      updated.push(
+        await markPaymentPaid({
+          db,
+          payment,
+          actor: req.auth.user,
+          paymentId: req.body?.payment_id || null,
+          proofUrl
+        })
+      );
+    }
+
+    return res.json({ payments: updated, count: updated.length });
+  } catch (e) {
+    return res.status(e.status || 400).json({ error: e.message || String(e) });
+  }
+});
+
+router.patch("/:id/pay", authorizeRoles("manager", "admin"), upload.single("proof"), async (req, res) => {
   const { id } = req.params;
   const { payment_id } = req.body || {};
 
   const db = getSupabaseAdmin();
-  const { data: payment, error: getErr } = await db.from("payments").select("*").eq("id", id).single();
+  const { data: payment, error: getErr } = await db
+    .from("payments")
+    .select("*,articles(id,title,unique_id,status)")
+    .eq("id", id)
+    .single();
   if (getErr) return res.status(400).json({ error: getErr.message });
+  if (payment.status === "paid") return res.status(400).json({ error: "Payment is already marked as paid" });
 
-  // ensure manager owns project
-  const { data: project, error: pErr } = await db.from("projects").select("created_by").eq("id", payment.project_id).single();
-  if (pErr) return res.status(400).json({ error: pErr.message });
-  if (project.created_by !== req.auth.user.id) return res.status(403).json({ error: "Forbidden" });
-
-  let proof_url = payment.proof_url || null;
-  if (req.file) {
-    // Upload to Supabase Storage bucket "payment-proofs"
-    const bucket = "payment-proofs";
-    const path = `${payment.writer_id}/${payment.article_id}/${Date.now()}_${req.file.originalname}`;
-    const { error: upErr } = await db.storage.from(bucket).upload(path, req.file.buffer, {
-      contentType: req.file.mimetype,
-      upsert: true
+  try {
+    await verifyPaymentAccess(db, payment, req.auth.user);
+    const proofUrl = await uploadProofFile(db, payment, req.file);
+    const updated = await markPaymentPaid({
+      db,
+      payment,
+      actor: req.auth.user,
+      paymentId: payment_id || null,
+      proofUrl
     });
-    if (upErr) return res.status(400).json({ error: upErr.message });
-    const { data: pub } = db.storage.from(bucket).getPublicUrl(path);
-    proof_url = pub?.publicUrl || null;
+    return res.json({ payment: updated });
+  } catch (e) {
+    return res.status(e.status || 400).json({ error: e.message || String(e) });
   }
-
-  const patch = {
-    status: "paid",
-    payment_id: payment_id || null,
-    proof_url,
-    paid_by: req.auth.user.id,
-    paid_at: new Date().toISOString()
-  };
-
-  const { data: updated, error } = await db.from("payments").update(patch).eq("id", id).select("*").single();
-  if (error) return res.status(400).json({ error: error.message });
-
-  await createNotification({
-    user_id: updated.writer_id,
-    type: "payment_received",
-    title: "Payment received",
-    body: `Your payment of ₹${updated.amount} has been processed.${updated.payment_id ? " Payment ID: " + updated.payment_id : ""}`,
-    payload: { payment_id: updated.id, article_id: updated.article_id, project_id: updated.project_id }
-  });
-
-  return res.json({ payment: updated });
 });
 
 module.exports = router;
