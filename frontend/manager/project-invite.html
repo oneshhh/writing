@@ -1,0 +1,76 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/png" href="/assets/realwrite-logo.png" />
+    <link rel="apple-touch-icon" href="/assets/realwrite-logo.png" />
+    <title>Real Write - Project Invite</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+    <script src="/shared/config.js"></script>
+    <script src="/shared/app.js"></script>
+    <script src="/shared/topbar.js"></script>
+  </head>
+  <body>
+    <div class="topbar" id="topbar"></div>
+    <div class="wrap">
+      <div class="card">
+        <h2>Join Project</h2>
+        <div class="muted" id="inviteMeta" style="margin-top:6px">Loading invite...</div>
+        <div class="right" style="margin-top:16px; flex-wrap:wrap;">
+          <a href="/manager/projects.html"><button class="secondary" type="button">Back</button></a>
+          <button id="acceptInvite" type="button">Accept invite</button>
+        </div>
+        <div class="muted" id="msg" style="margin-top: 10px"></div>
+      </div>
+    </div>
+    <script>
+      (async function () {
+        const user = await APP.requireRole("manager");
+        if (!user) return;
+        await renderTopbar({
+          role: user.role,
+          links: [
+            { href: "/manager/dashboard.html", label: "Dashboard" },
+            { href: "/manager/projects.html", label: "Projects" },
+            { href: "/manager/review.html", label: "Review" },
+            { href: "/manager/payments.html", label: "Payments" }
+          ]
+        });
+
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get("token");
+        const msg = (t) => (document.getElementById("msg").textContent = t || "");
+        const accept = document.getElementById("acceptInvite");
+
+        if (!token) {
+          document.getElementById("inviteMeta").textContent = "Invite token is missing.";
+          accept.disabled = true;
+          return;
+        }
+
+        try {
+          const out = await APP.apiFetch(`/api/projects/invites/${encodeURIComponent(token)}`);
+          document.getElementById("inviteMeta").innerHTML = `You are joining <strong>${APP.escapeHtml(out.project?.title || "this project")}</strong>.`;
+        } catch (e) {
+          document.getElementById("inviteMeta").textContent = e.message || String(e);
+          accept.disabled = true;
+          return;
+        }
+
+        accept.onclick = async () => {
+          msg("");
+          try {
+            const out = await APP.apiFetch(`/api/projects/invites/${encodeURIComponent(token)}/accept`, {
+              method: "POST",
+              body: JSON.stringify({})
+            });
+            window.location.href = `/manager/project-detail.html?id=${encodeURIComponent(out.project_id)}`;
+          } catch (e) {
+            msg(e.message || String(e));
+          }
+        };
+      })();
+    </script>
+  </body>
+</html>

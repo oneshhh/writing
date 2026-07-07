@@ -63,6 +63,14 @@
             <button class="secondary" id="next">Next</button>
           </div>
         </div>
+
+        <div class="card">
+          <h2>Writing Requests</h2>
+          <table class="mobile-stack-table">
+            <thead><tr><th>Request</th><th>Due</th><th>Extra pay</th><th>Status</th><th></th></tr></thead>
+            <tbody id="requestRows"></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -128,6 +136,43 @@
           document.getElementById("pageInfo").textContent = pages ? `Page ${page} of ${pages}` : `Page ${page}`;
         }
 
+        async function refreshRequests() {
+          APP.ui.tableSkeleton("requestRows", { rows: 4, cols: 5 });
+          const out = await APP.apiFetch("/api/requests");
+          const requests = out.requests || [];
+          document.getElementById("requestRows").innerHTML = requests.length
+            ? requests
+                .map(
+                  (r) => `<tr>
+                    <td data-label="Request"><strong>${APP.escapeHtml(r.title || "")}</strong><div class="muted">${APP.escapeHtml((r.brief || "").slice(0, 120))}</div></td>
+                    <td class="muted" data-label="Due">${r.due_at ? APP.escapeHtml(new Date(r.due_at).toLocaleString()) : "-"}</td>
+                    <td data-label="Extra pay">${r.additional_payment ? `&#8377;${APP.escapeHtml(r.additional_payment)}` : "-"}</td>
+                    <td data-label="Status">${APP.badgeForStatus(r.recipient_status || r.status || "open")}</td>
+                    <td class="right" data-label="Action">
+                      ${
+                        r.recipient_status === "pending"
+                          ? `<button class="secondary" data-accept-request="${r.id}">Accept</button><button class="danger" data-reject-request="${r.id}">Reject</button>`
+                          : ""
+                      }
+                    </td>
+                  </tr>`
+                )
+                .join("")
+            : "<tr><td colspan='5' class='muted'>No writing requests yet.</td></tr>";
+
+          for (const b of document.querySelectorAll("button[data-accept-request],button[data-reject-request]")) {
+            b.onclick = async () => {
+              const requestId = b.getAttribute("data-accept-request") || b.getAttribute("data-reject-request");
+              const action = b.hasAttribute("data-accept-request") ? "accepted" : "rejected";
+              await APP.apiFetch(`/api/requests/${encodeURIComponent(requestId)}/respond`, {
+                method: "POST",
+                body: JSON.stringify({ action })
+              });
+              await refreshRequests();
+            };
+          }
+        }
+
         async function loadPage() {
           APP.ui.tableSkeleton("rows", { rows: 8, cols: 8 });
           const list = await APP.apiFetch(`/api/articles?limit=${pageSize}&offset=${offset}`);
@@ -148,7 +193,8 @@
         const [stats, projects, list] = await Promise.all([
           APP.apiFetch("/api/articles/stats/me"),
           APP.apiFetch("/api/projects"),
-          APP.apiFetch(`/api/articles?limit=${pageSize}&offset=${offset}`)
+          APP.apiFetch(`/api/articles?limit=${pageSize}&offset=${offset}`),
+          refreshRequests()
         ]);
         APP.setText("nApproved", stats.counts.approved || 0);
         APP.setText("nRejected", stats.counts.rejected || 0);

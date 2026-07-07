@@ -3,6 +3,7 @@ const multer = require("multer");
 const { authorizeRoles } = require("../middleware/authorize");
 const { getSupabaseAdmin } = require("../utils/supabase");
 const { notifyWriter } = require("../services/writerNotifications");
+const { getManagerProjectIds, requireManagerProjectAccess } = require("../utils/projectAccess");
 
 const upload = multer({ storage: multer.memoryStorage() });
 const router = express.Router();
@@ -13,12 +14,6 @@ function parseCommonFilters(req) {
   const fromFilter = req.query.from ? String(req.query.from) : null;
   const toFilter = req.query.to ? String(req.query.to) : null;
   return { projectIdFilter, writerIdFilter, fromFilter, toFilter };
-}
-
-async function getManagerProjectIds(db, managerId) {
-  const { data: projects, error } = await db.from("projects").select("id").eq("created_by", managerId);
-  if (error) throw new Error(error.message);
-  return (projects || []).map((p) => p.id);
 }
 
 function applyDateFilters(q, { fromFilter, toFilter }) {
@@ -89,13 +84,7 @@ async function uploadProofFile(db, payment, file) {
 
 async function verifyPaymentAccess(db, payment, user) {
   if (user.role === "admin") return;
-  const { data: project, error: pErr } = await db.from("projects").select("created_by").eq("id", payment.project_id).single();
-  if (pErr) throw new Error(pErr.message);
-  if (project.created_by !== user.id) {
-    const err = new Error("Forbidden");
-    err.status = 403;
-    throw err;
-  }
+  await requireManagerProjectAccess(db, payment.project_id, user.id);
 }
 
 async function markPaymentPaid({ db, payment, actor, paymentId, proofUrl }) {
@@ -313,9 +302,12 @@ router.get("/", async (req, res) => {
 router.get("/summary", authorizeRoles("manager"), async (req, res) => {
   const db = getSupabaseAdmin();
   const managerId = req.auth.user.id;
-  const { data: projects, error: pErr } = await db.from("projects").select("id").eq("created_by", managerId);
-  if (pErr) return res.status(400).json({ error: pErr.message });
-  const projectIds = (projects || []).map((p) => p.id);
+  let projectIds;
+  try {
+    projectIds = await getManagerProjectIds(db, managerId);
+  } catch (e) {
+    return res.status(400).json({ error: e.message || String(e) });
+  }
   if (!projectIds.length) return res.json({ by_writer: [] });
 
   const { data: payments, error } = await db

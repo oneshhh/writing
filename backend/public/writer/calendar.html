@@ -1,0 +1,142 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/png" href="/assets/realwrite-logo.png" />
+    <link rel="apple-touch-icon" href="/assets/realwrite-logo.png" />
+    <title>Real Write - Writer Calendar</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+    <script src="/shared/config.js"></script>
+    <script src="/shared/app.js"></script>
+    <script src="/shared/topbar.js"></script>
+  </head>
+  <body>
+    <div class="topbar" id="topbar"></div>
+    <div class="wrap wide">
+      <div class="grid">
+        <div class="card">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+            <div>
+              <h3 style="margin:0">Planner</h3>
+              <div class="muted" id="rangeLabel" style="margin-top:6px">30-day writing calendar</div>
+            </div>
+            <div class="right">
+              <button class="secondary" id="prevRange" type="button">Previous 30 days</button>
+              <button class="secondary" id="todayRange" type="button">Today</button>
+              <button class="secondary" id="nextRange" type="button">Next 30 days</button>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div id="plannerGrid" class="planner-grid"></div>
+        </div>
+      </div>
+    </div>
+
+    <dialog id="noteDlg" style="border:0;border-radius:18px;box-shadow:0 26px 70px rgba(0,0,0,.18);padding:0;max-width:min(520px,calc(100vw - 32px));">
+      <form method="dialog" style="margin:0;padding:16px;background:rgba(255,255,255,.94);border:1px solid rgba(229,226,225,0.9);border-radius:18px;">
+        <h3 style="margin:0">Add calendar note</h3>
+        <div class="muted" id="noteDate" style="margin-top:4px"></div>
+        <div style="margin-top:12px">
+          <label class="muted">Title</label>
+          <input id="noteTitle" />
+        </div>
+        <div style="margin-top:10px">
+          <label class="muted">Note</label>
+          <textarea id="noteBody"></textarea>
+        </div>
+        <div class="right" style="margin-top:14px">
+          <button class="secondary" value="cancel" type="submit">Cancel</button>
+          <button value="ok" type="submit">Save note</button>
+        </div>
+        <div class="muted" id="noteMsg" style="margin-top:10px"></div>
+      </form>
+    </dialog>
+
+    <script>
+      (async function () {
+        const user = await APP.requireRole("writer");
+        if (!user) return;
+        await renderTopbar({ role: user.role, links: [{ href: "/writer/dashboard.html", label: "Dashboard" }, { href: "/writer/earnings.html", label: "Earnings" }] });
+
+        let start = new Date();
+        start.setHours(0, 0, 0, 0);
+
+        function key(d) {
+          return d.toISOString().slice(0, 10);
+        }
+
+        function shift(days) {
+          start.setDate(start.getDate() + days);
+          return load();
+        }
+
+        function render(days) {
+          const map = new Map((days || []).map((day) => [day.date, day]));
+          const cells = [];
+          for (let i = 0; i < 30; i += 1) {
+            const d = new Date(start);
+            d.setDate(start.getDate() + i);
+            const dateKey = key(d);
+            const row = map.get(dateKey) || { date: dateKey, submitted: 0, approved: 0, requests_due: 0, notes: [] };
+            cells.push(`<button class="planner-day" data-day="${dateKey}" type="button">
+              <span class="planner-date">${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
+              <strong>${d.toLocaleDateString(undefined, { weekday: "short" })}</strong>
+              <span class="planner-metrics">
+                <span>${row.submitted || 0} submitted</span>
+                <span>${row.approved || 0} approved</span>
+                <span>${row.requests_due || 0} due</span>
+              </span>
+              ${(row.notes || []).map((n) => `<span class="planner-note">${APP.escapeHtml(n.title)}</span>`).join("")}
+            </button>`);
+          }
+          document.getElementById("plannerGrid").innerHTML = cells.join("");
+          document.getElementById("rangeLabel").textContent = `${key(start)} to ${key(new Date(start.getTime() + 29 * 86400000))}`;
+          for (const cell of document.querySelectorAll("[data-day]")) {
+            cell.onclick = () => openNote(cell.getAttribute("data-day"));
+          }
+        }
+
+        async function load() {
+          const out = await APP.apiFetch(`/api/calendar?start=${encodeURIComponent(key(start))}&days=30`);
+          render(out.days || []);
+        }
+
+        function openNote(day) {
+          const dlg = document.getElementById("noteDlg");
+          document.getElementById("noteDate").textContent = day;
+          document.getElementById("noteTitle").value = "";
+          document.getElementById("noteBody").value = "";
+          document.getElementById("noteMsg").textContent = "";
+          const onClose = async () => {
+            dlg.removeEventListener("close", onClose);
+            if (dlg.returnValue !== "ok") return;
+            try {
+              await APP.apiFetch("/api/calendar/notes", {
+                method: "POST",
+                body: JSON.stringify({ event_date: day, title: document.getElementById("noteTitle").value.trim(), note: document.getElementById("noteBody").value })
+              });
+              await load();
+            } catch (e) {
+              document.getElementById("noteMsg").textContent = e.message || String(e);
+              dlg.showModal();
+              dlg.addEventListener("close", onClose);
+            }
+          };
+          dlg.addEventListener("close", onClose);
+          dlg.showModal();
+        }
+
+        document.getElementById("prevRange").onclick = () => shift(-30);
+        document.getElementById("nextRange").onclick = () => shift(30);
+        document.getElementById("todayRange").onclick = () => {
+          start = new Date();
+          start.setHours(0, 0, 0, 0);
+          return load();
+        };
+        await load();
+      })();
+    </script>
+  </body>
+</html>

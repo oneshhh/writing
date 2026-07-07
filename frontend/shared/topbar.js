@@ -11,6 +11,8 @@ async function renderTopbar({ role, links }) {
     if (l.includes("users") || l.includes("team")) return "groups";
     if (l.includes("project")) return "folder_copy";
     if (l.includes("review")) return "fact_check";
+    if (l.includes("calendar") || l.includes("planner")) return "calendar_month";
+    if (l.includes("message")) return "forum";
     if (l.includes("payment")) return "payments";
     if (l.includes("earning")) return "paid";
     if (l.includes("submit") || h.includes("submit")) return "edit";
@@ -31,6 +33,15 @@ async function renderTopbar({ role, links }) {
     label: l.label,
     icon: l.icon || guessIcon(l.label, l.href)
   }));
+  if (role === "manager" && !navLinks.some((l) => l.href === "/manager/calendar.html")) {
+    navLinks.push({ href: "/manager/calendar.html", label: "Calendar", icon: "calendar_month" });
+  }
+  if (role === "writer" && !navLinks.some((l) => l.href === "/writer/calendar.html")) {
+    navLinks.push({ href: "/writer/calendar.html", label: "Calendar", icon: "calendar_month" });
+  }
+  if ((role === "manager" || role === "writer") && !navLinks.some((l) => l.href === `/${role}/messages.html`)) {
+    navLinks.push({ href: `/${role}/messages.html`, label: "Messages", icon: "forum" });
+  }
   navLinks.push({ href: "/shared/notifications.html", label: "Notifications", icon: "notifications" });
   navLinks.push({ href: "/profile.html", label: "Profile", icon: "account_circle" });
 

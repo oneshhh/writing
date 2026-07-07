@@ -29,6 +29,19 @@
             <label class="pill"><input type="checkbox" id="ai" /> AI check enabled</label>
             <label class="pill"><input type="checkbox" id="plag" /> Plagiarism check enabled</label>
           </div>
+          <div style="margin-top: 14px">
+            <label class="muted">Add managers now (optional)</label>
+            <input id="managerSearch" placeholder="search manager name or email..." />
+            <div class="muted" id="selectedManagers" style="margin-top:8px"></div>
+            <div
+              style="margin-top: 10px; max-height: 220px; overflow: auto; border: 1px solid rgba(229,226,225,0.95); border-radius: 16px; background: rgba(255,255,255,.65)"
+            >
+              <table style="margin: 0">
+                <thead><tr><th>Manager</th><th></th></tr></thead>
+                <tbody id="managerRows"></tbody>
+              </table>
+            </div>
+          </div>
           <div class="right" style="margin-top: 12px">
             <button id="create">Create</button>
           </div>
@@ -50,6 +63,50 @@
         await renderTopbar({ role: user.role, links: [{ href: "/manager/dashboard.html", label: "Dashboard" }] });
 
         const msg = (t) => (document.getElementById("msg").textContent = t || "");
+        let allManagers = [];
+        const selectedManagerIds = new Set();
+
+        function renderSelectedManagers() {
+          const selected = allManagers.filter((m) => selectedManagerIds.has(m.id));
+          document.getElementById("selectedManagers").textContent = selected.length
+            ? `Selected: ${selected.map((m) => m.full_name || m.email).join(", ")}`
+            : "No extra managers selected.";
+        }
+
+        function renderManagerRows() {
+          document.getElementById("managerRows").innerHTML = allManagers.length
+            ? allManagers
+                .filter((m) => m.id !== user.id)
+                .map(
+                  (m) => `<tr>
+                    <td>${APP.escapeHtml(m.full_name || "Manager")}<div class="muted">${APP.escapeHtml(m.email || "")}</div></td>
+                    <td class="right">
+                      <button class="secondary" data-manager="${m.id}">
+                        ${selectedManagerIds.has(m.id) ? "Remove" : "Add"}
+                      </button>
+                    </td>
+                  </tr>`
+                )
+                .join("")
+            : "<tr><td colspan='2' class='muted'>No managers found.</td></tr>";
+
+          for (const b of document.querySelectorAll("button[data-manager]")) {
+            b.onclick = () => {
+              const managerId = b.getAttribute("data-manager");
+              if (selectedManagerIds.has(managerId)) selectedManagerIds.delete(managerId);
+              else selectedManagerIds.add(managerId);
+              renderSelectedManagers();
+              renderManagerRows();
+            };
+          }
+          renderSelectedManagers();
+        }
+
+        async function loadManagers(q) {
+          const resp = await APP.apiFetch(`/api/users/managers${q ? `?q=${encodeURIComponent(q)}` : ""}`, { skipLoader: true });
+          allManagers = resp.users || [];
+          renderManagerRows();
+        }
 
         async function refresh() {
           APP.ui.tableSkeleton("rows", { rows: 8, cols: 3 });
@@ -89,19 +146,30 @@
               title: document.getElementById("title").value.trim(),
               description: document.getElementById("desc").value,
               ai_check_enabled: document.getElementById("ai").checked,
-              plagiarism_check_enabled: document.getElementById("plag").checked
+              plagiarism_check_enabled: document.getElementById("plag").checked,
+              manager_ids: Array.from(selectedManagerIds)
             };
             await APP.apiFetch("/api/projects", { method: "POST", body: JSON.stringify(body) });
             document.getElementById("title").value = "";
             document.getElementById("desc").value = "";
             document.getElementById("ai").checked = false;
             document.getElementById("plag").checked = false;
+            selectedManagerIds.clear();
+            renderSelectedManagers();
             await refresh();
             msg("Created.");
           } catch (e) {
             msg(e.message || String(e));
           }
         };
+
+        let managerSearchTimer = null;
+        document.getElementById("managerSearch").addEventListener("input", () => {
+          const q = String(document.getElementById("managerSearch").value || "").trim();
+          if (managerSearchTimer) clearTimeout(managerSearchTimer);
+          managerSearchTimer = setTimeout(() => loadManagers(q).catch((e) => msg(e.message || String(e))), 220);
+        });
+        await loadManagers("");
       })();
     </script>
   </body>

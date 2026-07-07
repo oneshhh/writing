@@ -72,6 +72,44 @@ router.get("/writers", authorizeRoles("manager", "admin"), async (req, res) => {
   return res.json({ users: data });
 });
 
+router.get("/managers", authorizeRoles("manager", "admin"), async (req, res) => {
+  const db = getSupabaseAdmin();
+  const q = String(req.query.q || "").trim();
+
+  const select = "id,unique_id,email,full_name,role,avatar_url,created_at,is_active";
+  if (q) {
+    const [byName, byEmail] = await Promise.all([
+      db
+        .from("users")
+        .select(select)
+        .eq("role", "manager")
+        .eq("is_active", true)
+        .ilike("full_name", `%${q}%`)
+        .order("created_at", { ascending: false }),
+      db
+        .from("users")
+        .select(select)
+        .eq("role", "manager")
+        .eq("is_active", true)
+        .ilike("email", `%${q}%`)
+        .order("created_at", { ascending: false })
+    ]);
+    const err = byName.error || byEmail.error;
+    if (err) return res.status(400).json({ error: err.message });
+    const all = [...(byName.data || []), ...(byEmail.data || [])];
+    return res.json({ users: Array.from(new Map(all.map((u) => [u.id, u])).values()) });
+  }
+
+  const { data, error } = await db
+    .from("users")
+    .select(select)
+    .eq("role", "manager")
+    .eq("is_active", true)
+    .order("created_at", { ascending: false });
+  if (error) return res.status(400).json({ error: error.message });
+  return res.json({ users: data });
+});
+
 router.get("/", authorizeRoles("admin"), async (req, res) => {
   const db = getSupabaseAdmin();
   const { data, error } = await db

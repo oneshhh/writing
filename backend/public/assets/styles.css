@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Literata:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400..800&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap");
 
 :root {
@@ -32,6 +32,9 @@
 
   --rw-header-h: 72px;
   --rw-sidebar-w: 272px;
+  --rw-font-sans: "Modern Sans", "Geist", "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --rw-heading-weight: 780;
+  --rw-heading-tracking: -0.018em;
 }
 
 * {
@@ -45,12 +48,24 @@ body {
 
 body {
   margin: 0;
-  font-family: "Geist", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  font-family: var(--rw-font-sans);
   background: radial-gradient(1200px 600px at 20% -10%, rgba(201, 234, 220, 0.55), transparent 55%),
     radial-gradient(900px 500px at 110% 10%, rgba(225, 227, 228, 0.65), transparent 45%), var(--rw-bg);
   color: var(--rw-text);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--rw-font-sans);
+  color: var(--rw-text);
+  letter-spacing: var(--rw-heading-tracking);
+  text-wrap: balance;
 }
 
 a {
@@ -124,16 +139,16 @@ a:hover {
 }
 
 .rw-brand-name {
-  font-family: "Literata", ui-serif, Georgia, serif;
-  font-weight: 700;
-  letter-spacing: 0.2px;
+  font-family: var(--rw-font-sans);
+  font-weight: 800;
+  letter-spacing: -0.015em;
 }
 
 .rw-brand-sub {
   display: block;
   font-size: 12px;
   color: var(--rw-muted);
-  font-family: "Geist", system-ui, sans-serif;
+  font-family: var(--rw-font-sans);
   font-weight: 500;
   margin-top: 2px;
 }
@@ -216,9 +231,10 @@ a:hover {
 }
 
 .rw-header-title {
-  font-family: "Literata", ui-serif, Georgia, serif;
-  font-size: 18px;
-  font-weight: 650;
+  font-family: var(--rw-font-sans);
+  font-size: 19px;
+  font-weight: var(--rw-heading-weight);
+  letter-spacing: -0.02em;
   color: var(--rw-text);
   white-space: nowrap;
   overflow: hidden;
@@ -320,18 +336,20 @@ a:hover {
 
 .card h2 {
   margin: 0 0 12px 0;
-  font-size: 14px;
-  color: var(--rw-muted);
-  font-weight: 700;
-  letter-spacing: 0.2px;
+  font-size: 13px;
+  color: var(--rw-muted-2);
+  font-weight: 800;
+  letter-spacing: 0.055em;
   text-transform: uppercase;
 }
 
 .card h3 {
   margin: 0;
-  font-size: 18px;
-  font-weight: 650;
-  font-family: "Literata", ui-serif, Georgia, serif;
+  font-size: clamp(19px, 1.6vw, 24px);
+  font-weight: var(--rw-heading-weight);
+  font-family: var(--rw-font-sans);
+  letter-spacing: var(--rw-heading-tracking);
+  line-height: 1.14;
 }
 
 .profile-card {
@@ -349,10 +367,10 @@ a:hover {
 .profile-page h2 {
   margin: 0;
   color: #0b0b0b;
-  font-family: "Literata", ui-serif, Georgia, serif;
-  font-size: 22px;
-  font-weight: 750;
-  letter-spacing: 0;
+  font-family: var(--rw-font-sans);
+  font-size: clamp(21px, 2vw, 28px);
+  font-weight: var(--rw-heading-weight);
+  letter-spacing: var(--rw-heading-tracking);
   text-transform: none;
 }
 
@@ -395,7 +413,7 @@ a:hover {
   border-radius: 18px;
   background: #0b0b0b;
   color: #ffffff;
-  font-family: "Literata", ui-serif, Georgia, serif;
+  font-family: var(--rw-font-sans);
   font-size: 24px;
   font-weight: 750;
 }
@@ -520,7 +538,7 @@ a:hover {
 .stat .n {
   font-size: 28px;
   font-weight: 800;
-  letter-spacing: -0.6px;
+  letter-spacing: -0.035em;
   margin-top: 8px;
   color: var(--rw-text);
 }
@@ -586,9 +604,9 @@ td {
 
 th {
   color: var(--rw-text);
-  font-weight: 700;
+  font-weight: 800;
   font-size: 12px;
-  letter-spacing: 0.2px;
+  letter-spacing: 0.045em;
   text-transform: uppercase;
   background: rgba(246, 243, 242, 0.8);
 }
@@ -700,7 +718,8 @@ button {
   padding: 10px 14px;
   background: linear-gradient(135deg, var(--rw-primary) 0%, #093024 100%);
   color: white;
-  font-weight: 750;
+  font-weight: 800;
+  letter-spacing: -0.01em;
   cursor: pointer;
   box-shadow: 0 14px 28px rgba(13, 43, 34, 0.22);
   transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
@@ -1318,10 +1337,11 @@ button.danger {
 .review-title-block h1 {
   margin: 12px 0 8px 0;
   color: var(--rw-text);
-  font-family: "Literata", ui-serif, Georgia, serif;
-  font-size: clamp(24px, 3vw, 38px);
-  line-height: 1.12;
-  letter-spacing: 0;
+  font-family: var(--rw-font-sans);
+  font-size: clamp(26px, 3vw, 40px);
+  line-height: 1.04;
+  font-weight: 820;
+  letter-spacing: -0.035em;
   overflow-wrap: anywhere;
 }
 
@@ -1366,9 +1386,10 @@ button.danger {
 .review-long-body h1,
 .review-long-body h2,
 .review-long-body h3 {
-  font-family: "Literata", ui-serif, Georgia, serif;
-  line-height: 1.2;
-  letter-spacing: 0;
+  font-family: var(--rw-font-sans);
+  line-height: 1.12;
+  font-weight: 800;
+  letter-spacing: -0.025em;
 }
 
 .review-note-block {
@@ -1378,6 +1399,61 @@ button.danger {
 
 .review-actions {
   margin-top: 12px;
+}
+
+.planner-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+}
+
+.planner-day {
+  min-height: 142px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(229, 226, 225, 0.95);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.74);
+  color: var(--rw-text);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.04);
+  text-align: left;
+}
+
+button.planner-day {
+  background: rgba(255, 255, 255, 0.74);
+  color: var(--rw-text);
+}
+
+.planner-date {
+  color: var(--rw-muted);
+  font-size: 12px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.planner-metrics {
+  display: grid;
+  gap: 4px;
+  color: var(--rw-muted-2);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.planner-note {
+  margin-top: auto;
+  max-width: 100%;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(201, 234, 220, 0.6);
+  color: var(--rw-primary);
+  font-size: 11px;
+  font-weight: 750;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .autosave-status {
@@ -1490,7 +1566,7 @@ button.danger {
 }
 
 .ql-editor {
-  font-family: "Geist", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  font-family: var(--rw-font-sans);
   color: var(--rw-text);
   line-height: 1.65;
   font-size: 14px;
@@ -1499,8 +1575,10 @@ button.danger {
 .ql-editor h1,
 .ql-editor h2,
 .ql-editor h3 {
-  font-family: "Literata", ui-serif, Georgia, serif;
-  letter-spacing: -0.2px;
+  font-family: var(--rw-font-sans);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.12;
 }
 
 @media (max-width: 720px) {

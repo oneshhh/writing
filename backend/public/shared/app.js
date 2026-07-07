@@ -270,11 +270,11 @@ function clearText(id, text) {
 
 function badgeForStatus(status) {
   const cls =
-    status === "draft"
+    status === "draft" || status === "open" || status === "pending"
       ? "b-draft"
       : status === "submitted"
         ? "b-submitted"
-        : status === "approved"
+        : status === "approved" || status === "accepted"
           ? "b-approved"
           : status === "rework"
             ? "b-rework"

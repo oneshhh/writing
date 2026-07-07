@@ -5,6 +5,7 @@ const { buildArticleUniqueId } = require("../utils/uniqueId");
 const { runAiCheck } = require("../services/aiCheck");
 const { runPlagiarismCheck } = require("../services/plagiarismCheck");
 const { notifyWriter } = require("../services/writerNotifications");
+const { getManagerProjectIds, requireManagerProjectAccess } = require("../utils/projectAccess");
 
 const router = express.Router();
 
@@ -47,10 +48,8 @@ function monthRange(month) {
 async function ensureProjectAccess(db, projectId, user) {
   const { data: project, error } = await db.from("projects").select("*").eq("id", projectId).single();
   if (error) throw error;
-  if (user.role === "manager" && project.created_by !== user.id) {
-    const forbidden = new Error("Forbidden");
-    forbidden.status = 403;
-    throw forbidden;
+  if (user.role === "manager") {
+    await requireManagerProjectAccess(db, projectId, user.id);
   }
   return project;
 }
@@ -80,9 +79,12 @@ router.get("/", async (req, res) => {
 
   if (user.role === "manager") {
     // manager sees articles in their projects
-    const { data: projects, error: pErr } = await db.from("projects").select("id").eq("created_by", user.id);
-    if (pErr) return res.status(400).json({ error: pErr.message });
-    const projectIds = (projects || []).map((p) => p.id);
+    let projectIds;
+    try {
+      projectIds = await getManagerProjectIds(db, user.id);
+    } catch (e) {
+      return res.status(400).json({ error: e.message || String(e) });
+    }
     if (projectIds.length === 0) return res.json({ articles: [] });
 
     let q = db
@@ -159,9 +161,12 @@ router.get("/stats/monthly", authorizeRoles("writer", "manager", "admin"), async
   }
 
   if (user.role === "manager") {
-    const { data: projects, error: pErr } = await db.from("projects").select("id").eq("created_by", user.id);
-    if (pErr) return res.status(400).json({ error: pErr.message });
-    const projectIds = (projects || []).map((p) => p.id);
+    let projectIds;
+    try {
+      projectIds = await getManagerProjectIds(db, user.id);
+    } catch (e) {
+      return res.status(400).json({ error: e.message || String(e) });
+    }
     if (projectIds.length === 0) return res.json({ months: keys.map((k) => ({ month: k, count: 0 })) });
 
     const { data, error } = await db
@@ -317,9 +322,11 @@ router.get("/:id", authorizeRoles("writer", "manager", "admin"), async (req, res
   }
 
   if (user.role === "manager") {
-    const { data: project, error: pErr } = await db.from("projects").select("created_by").eq("id", article.project_id).single();
-    if (pErr) return res.status(400).json({ error: pErr.message });
-    if (project.created_by !== user.id) return res.status(403).json({ error: "Forbidden" });
+    try {
+      await requireManagerProjectAccess(db, article.project_id, user.id);
+    } catch (e) {
+      return res.status(e.status || 400).json({ error: e.message || "Forbidden" });
+    }
     return res.json({ article });
   }
 
@@ -449,9 +456,11 @@ router.post("/:id/review", authorizeRoles("manager"), async (req, res) => {
   if (getErr) return res.status(400).json({ error: getErr.message });
   if (article.status !== "submitted") return res.status(400).json({ error: "Only submitted articles can be reviewed" });
 
-  const { data: project, error: pErr } = await db.from("projects").select("created_by").eq("id", article.project_id).single();
-  if (pErr) return res.status(400).json({ error: pErr.message });
-  if (project.created_by !== req.auth.user.id) return res.status(403).json({ error: "Forbidden" });
+  try {
+    await requireManagerProjectAccess(db, article.project_id, req.auth.user.id);
+  } catch (e) {
+    return res.status(e.status || 400).json({ error: e.message || "Forbidden" });
+  }
 
   const { data: updated, error } = await db
     .from("articles")
@@ -528,6 +537,13 @@ router.post("/:id/checks", authorizeRoles("manager", "admin"), async (req, res) 
   if (getErr) return res.status(400).json({ error: getErr.message });
   const { data: project, error: pErr } = await db.from("projects").select("*").eq("id", article.project_id).single();
   if (pErr) return res.status(400).json({ error: pErr.message });
+  if (req.auth.user.role === "manager") {
+    try {
+      await requireManagerProjectAccess(db, article.project_id, req.auth.user.id);
+    } catch (e) {
+      return res.status(e.status || 400).json({ error: e.message || "Forbidden" });
+    }
+  }
 
   const patch = {};
   if (project.ai_check_enabled) patch.ai_score = await runAiCheck(article);

@@ -4,6 +4,7 @@ const { getSupabaseAdmin } = require("../utils/supabase");
 const { makeArticleTextExport, safeExportFilename } = require("../services/exportArticleTemplate");
 const { exportArticlePdf } = require("../services/exportPDF");
 const { exportArticleDocxBuffer } = require("../services/exportDocx");
+const { requireManagerProjectAccess } = require("../utils/projectAccess");
 
 const router = express.Router();
 
@@ -29,9 +30,13 @@ async function loadExportContext(req, res) {
     return null;
   }
 
-  if (user.role === "manager" && project.created_by !== user.id) {
-    res.status(403).json({ error: "Forbidden" });
-    return null;
+  if (user.role === "manager") {
+    try {
+      await requireManagerProjectAccess(db, article.project_id, user.id);
+    } catch (e) {
+      res.status(e.status || 403).json({ error: e.message || "Forbidden" });
+      return null;
+    }
   }
 
   const { data: writer } = await db.from("users").select("full_name").eq("id", article.writer_id).single();

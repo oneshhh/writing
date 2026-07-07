@@ -22,12 +22,14 @@
               <div class="muted" id="projectMeta" style="margin-top:6px"></div>
             </div>
             <div class="right" style="flex-wrap:wrap;">
+              <button class="secondary" id="toggleSettings" type="button">Project Settings</button>
+              <button id="raiseRequest" type="button">Raise Request</button>
               <a href="/manager/projects.html"><button class="secondary" type="button">Back</button></a>
             </div>
           </div>
         </div>
 
-        <div class="card" style="grid-column: span 5">
+        <div class="card hidden" id="projectSettingsCard" style="grid-column: span 5">
           <h2>Project Settings</h2>
           <div>
             <label class="muted">Title</label>
@@ -70,11 +72,57 @@
           <div class="muted" id="msg" style="margin-top: 10px"></div>
         </div>
 
-        <div class="card" style="grid-column: span 7">
+        <div class="card hidden" id="assignedWritersCard" style="grid-column: span 7">
           <h2>Assigned Writers</h2>
           <table>
             <thead><tr><th>Writer</th><th>Price</th><th>Assigned</th><th></th></tr></thead>
             <tbody id="rows"></tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+            <div>
+              <h2 style="margin-bottom: 6px">Requests</h2>
+              <div class="muted">Topic requests raised for writers in this project.</div>
+            </div>
+            <button id="raiseRequestInline" type="button">Raise Request</button>
+          </div>
+          <div style="margin-top: 14px; overflow:auto;">
+            <table>
+              <thead><tr><th>Request</th><th>Due</th><th>Scope</th><th>Status</th><th>Writer responses</th><th></th></tr></thead>
+              <tbody id="requestRows"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" style="grid-column: span 5">
+          <h2>Project Managers</h2>
+          <div style="margin-top: 10px">
+            <label class="muted">Add manager</label>
+            <input id="managerSearch" placeholder="type a manager name or email..." />
+          </div>
+          <div
+            style="margin-top: 10px; max-height: 220px; overflow: auto; border: 1px solid rgba(229,226,225,0.95); border-radius: 16px; background: rgba(255,255,255,.65)"
+          >
+            <table style="margin: 0">
+              <thead><tr><th>Manager</th><th></th></tr></thead>
+              <tbody id="managerRows"></tbody>
+            </table>
+          </div>
+          <div style="margin-top: 16px">
+            <div class="right" style="flex-wrap:wrap;">
+              <button class="secondary" id="createInvite" type="button">Create invite link</button>
+            </div>
+            <input id="inviteLink" readonly style="margin-top: 10px" placeholder="Invite link will appear here" />
+          </div>
+        </div>
+
+        <div class="card" style="grid-column: span 7">
+          <h2>Active Managers</h2>
+          <table>
+            <thead><tr><th>Manager</th><th>Access</th><th>Joined</th><th></th></tr></thead>
+            <tbody id="projectManagerRows"></tbody>
           </table>
         </div>
 
@@ -143,6 +191,58 @@
       </form>
     </dialog>
 
+    <dialog id="requestDlg" style="border:0;border-radius:18px;box-shadow:0 26px 70px rgba(0,0,0,.18);padding:0;max-width:min(760px,calc(100vw - 32px));">
+      <form method="dialog" style="margin:0;padding:16px;background:rgba(255,255,255,.94);border:1px solid rgba(229,226,225,0.9);border-radius:18px;backdrop-filter: blur(12px);">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+          <div>
+            <div style="font-weight:800;font-size:15px;color:var(--rw-text);">Raise writing request</div>
+            <div class="muted" style="margin-top:4px;">Send a topic brief to one writer or the whole project team.</div>
+          </div>
+          <button class="secondary" value="cancel" type="submit" aria-label="Close" style="padding:8px 10px;border-radius:12px;">&times;</button>
+        </div>
+        <div class="two" style="margin-top:12px">
+          <div>
+            <label class="muted">Topic / title</label>
+            <input id="reqTitle" />
+          </div>
+          <div>
+            <label class="muted">Due date</label>
+            <input id="reqDue" type="datetime-local" />
+          </div>
+        </div>
+        <div style="margin-top:10px">
+          <label class="muted">Brief</label>
+          <textarea id="reqBrief" placeholder="What should the writer cover?"></textarea>
+        </div>
+        <div class="two" style="margin-top:10px">
+          <div>
+            <label class="muted">Reference links</label>
+            <textarea id="reqLinks" placeholder="One link per line"></textarea>
+          </div>
+          <div>
+            <label class="muted">Additional payment (optional)</label>
+            <input id="reqPayment" type="number" min="0" step="0.01" />
+            <div style="margin-top:10px">
+              <label class="muted">Send to</label>
+              <select id="reqScope">
+                <option value="group">All assigned writers</option>
+                <option value="personal">One writer</option>
+              </select>
+            </div>
+            <div id="reqWriterWrap" style="margin-top:10px">
+              <label class="muted">Writer</label>
+              <select id="reqWriter"></select>
+            </div>
+          </div>
+        </div>
+        <div class="right" style="margin-top:14px">
+          <button class="secondary" value="cancel" type="submit">Cancel</button>
+          <button id="reqOk" value="ok" type="submit">Send request</button>
+        </div>
+        <div class="muted" id="reqMsg" style="margin-top:10px"></div>
+      </form>
+    </dialog>
+
     <script>
       (async function () {
         const user = await APP.requireRole("manager");
@@ -168,6 +268,9 @@
         const monthSelect = document.getElementById("monthSelect");
         let project = null;
         let allWriters = [];
+        let allManagers = [];
+        let activeManagers = [];
+        let assignedWriters = [];
         let activeMonth = currentMonthKey();
         let availableMonths = [];
 
@@ -212,6 +315,7 @@
           APP.ui.tableSkeleton("rows", { rows: 6, cols: 4 });
           const writers = await APP.apiFetch(`/api/projects/${encodeURIComponent(id)}/writers`);
           const assigned = writers.writers || [];
+          assignedWriters = assigned;
           window.__assignedWriters = new Map(assigned.map((w) => [w.writer_id, w]));
           document.getElementById("rows").innerHTML = assigned.length
             ? assigned
@@ -261,6 +365,185 @@
                 await refreshAssigned();
                 renderWriterRows();
                 msg("Removed.");
+              } catch (e) {
+                msg(e.message || String(e));
+              }
+            };
+          }
+        }
+
+        async function refreshRequests() {
+          APP.ui.tableSkeleton("requestRows", { rows: 5, cols: 6 });
+          const out = await APP.apiFetch(`/api/requests?project_id=${encodeURIComponent(id)}`);
+          const requests = out.requests || [];
+          document.getElementById("requestRows").innerHTML = requests.length
+            ? requests
+                .map((r) => {
+                  const recipients = r.recipients || [];
+                  const accepted = recipients.filter((x) => x.status === "accepted").length;
+                  const rejected = recipients.filter((x) => x.status === "rejected").length;
+                  const pending = recipients.filter((x) => x.status === "pending").length;
+                  return `<tr>
+                    <td><strong>${APP.escapeHtml(r.title || "")}</strong><div class="muted">${APP.escapeHtml((r.brief || "").slice(0, 110))}</div></td>
+                    <td class="muted">${r.due_at ? APP.escapeHtml(new Date(r.due_at).toLocaleString()) : "-"}</td>
+                    <td><span class="pill">${APP.escapeHtml(r.send_scope || "group")}</span></td>
+                    <td>${APP.badgeForStatus(r.status || "open")}</td>
+                    <td class="muted">${accepted} accepted, ${rejected} rejected, ${pending} pending</td>
+                    <td class="right">${r.status === "open" ? `<button class="secondary" data-close-request="${r.id}">Close</button>` : ""}</td>
+                  </tr>`;
+                })
+                .join("")
+            : "<tr><td colspan='6' class='muted'>No requests raised yet.</td></tr>";
+
+          for (const b of document.querySelectorAll("button[data-close-request]")) {
+            b.onclick = async () => {
+              msg("");
+              try {
+                await APP.apiFetch(`/api/requests/${encodeURIComponent(b.getAttribute("data-close-request"))}/close`, {
+                  method: "PATCH",
+                  body: JSON.stringify({})
+                });
+                await refreshRequests();
+                msg("Request closed.");
+              } catch (e) {
+                msg(e.message || String(e));
+              }
+            };
+          }
+        }
+
+        async function openRequestDialog() {
+          const dlg = document.getElementById("requestDlg");
+          const scope = document.getElementById("reqScope");
+          const writerWrap = document.getElementById("reqWriterWrap");
+          const writerSelect = document.getElementById("reqWriter");
+          const reqMsg = document.getElementById("reqMsg");
+          reqMsg.textContent = "";
+          writerSelect.innerHTML = assignedWriters
+            .map((w) => `<option value="${w.writer_id}">${APP.escapeHtml(w.users?.full_name || w.users?.email || "Writer")}</option>`)
+            .join("");
+          const syncScope = () => {
+            writerWrap.classList.toggle("hidden", scope.value !== "personal");
+          };
+          scope.onchange = syncScope;
+          syncScope();
+
+          return new Promise((resolve) => {
+            const onClose = async () => {
+              dlg.removeEventListener("close", onClose);
+              if (dlg.returnValue !== "ok") return resolve(false);
+              try {
+                const dueValue = document.getElementById("reqDue").value;
+                const body = {
+                  project_id: id,
+                  title: document.getElementById("reqTitle").value.trim(),
+                  brief: document.getElementById("reqBrief").value,
+                  reference_links: document.getElementById("reqLinks").value,
+                  additional_payment: document.getElementById("reqPayment").value,
+                  due_at: dueValue ? new Date(dueValue).toISOString() : null,
+                  send_scope: scope.value,
+                  writer_ids: scope.value === "personal" ? [writerSelect.value] : []
+                };
+                await APP.apiFetch("/api/requests", { method: "POST", body: JSON.stringify(body) });
+                document.getElementById("reqTitle").value = "";
+                document.getElementById("reqBrief").value = "";
+                document.getElementById("reqLinks").value = "";
+                document.getElementById("reqPayment").value = "";
+                document.getElementById("reqDue").value = "";
+                await refreshRequests();
+                msg("Request sent.");
+                resolve(true);
+              } catch (e) {
+                reqMsg.textContent = e.message || String(e);
+                dlg.showModal();
+                dlg.addEventListener("close", onClose);
+              }
+            };
+            dlg.addEventListener("close", onClose);
+            dlg.showModal();
+          });
+        }
+
+        async function refreshManagers() {
+          APP.ui.tableSkeleton("projectManagerRows", { rows: 4, cols: 4 });
+          const out = await APP.apiFetch(`/api/projects/${encodeURIComponent(id)}/managers`);
+          activeManagers = out.managers || [];
+          window.__activeManagers = new Map(activeManagers.map((m) => [m.manager_id, m]));
+          document.getElementById("projectManagerRows").innerHTML = activeManagers.length
+            ? activeManagers
+                .map(
+                  (m) => `<tr>
+                    <td>${APP.escapeHtml(m.users?.full_name || "Manager")}<div class="muted">${APP.escapeHtml(m.users?.email || "")}</div></td>
+                    <td><span class="pill">${APP.escapeHtml(m.role || "manager")}</span></td>
+                    <td class="muted">${APP.escapeHtml(new Date(m.joined_at).toLocaleString())}</td>
+                    <td class="right">
+                      ${
+                        m.manager_id === user.id || m.role === "owner"
+                          ? "<span class='muted'>Locked</span>"
+                          : `<button class="danger" data-remove-manager="${m.manager_id}">Remove</button>`
+                      }
+                    </td>
+                  </tr>`
+                )
+                .join("")
+            : "<tr><td colspan='4' class='muted'>No managers assigned.</td></tr>";
+
+          for (const b of document.querySelectorAll("button[data-remove-manager]")) {
+            b.onclick = async () => {
+              const managerId = b.getAttribute("data-remove-manager");
+              const row = window.__activeManagers.get(managerId);
+              const ok = confirm(`Remove ${row?.users?.full_name || "manager"} from this project?`);
+              if (!ok) return;
+              msg("");
+              try {
+                await APP.apiFetch(`/api/projects/${encodeURIComponent(id)}/managers/${encodeURIComponent(managerId)}`, { method: "DELETE" });
+                await refreshManagers();
+                renderManagerRows();
+                msg("Manager removed.");
+              } catch (e) {
+                msg(e.message || String(e));
+              }
+            };
+          }
+        }
+
+        async function loadManagers(q) {
+          const resp = await APP.apiFetch(`/api/users/managers${q ? `?q=${encodeURIComponent(q)}` : ""}`, { skipLoader: true });
+          allManagers = resp.users || [];
+          renderManagerRows();
+        }
+
+        function renderManagerRows() {
+          const managerMap = window.__activeManagers || new Map();
+          document.getElementById("managerRows").innerHTML = allManagers.length
+            ? allManagers
+                .filter((m) => m.id !== user.id)
+                .map(
+                  (m) => `<tr>
+                    <td>${APP.escapeHtml(m.full_name || "Manager")}<div class="muted">${APP.escapeHtml(m.email || "")}</div></td>
+                    <td class="right">
+                      ${
+                        managerMap.has(m.id)
+                          ? "<span class='pill' style='padding:6px 10px; font-weight:750;'>Already added</span>"
+                          : `<button class="secondary" data-add-manager="${m.id}">Add</button>`
+                      }
+                    </td>
+                  </tr>`
+                )
+                .join("")
+            : "<tr><td colspan='2' class='muted'>No managers found.</td></tr>";
+
+          for (const b of document.querySelectorAll("button[data-add-manager]")) {
+            b.onclick = async () => {
+              msg("");
+              try {
+                await APP.apiFetch(`/api/projects/${encodeURIComponent(id)}/managers`, {
+                  method: "POST",
+                  body: JSON.stringify({ manager_id: b.getAttribute("data-add-manager") })
+                });
+                await refreshManagers();
+                renderManagerRows();
+                msg("Manager added.");
               } catch (e) {
                 msg(e.message || String(e));
               }
@@ -445,6 +728,35 @@
           }, 220);
         });
 
+        let managerSearchTimer = null;
+        document.getElementById("managerSearch").addEventListener("input", () => {
+          const q = String(document.getElementById("managerSearch").value || "").trim();
+          if (managerSearchTimer) clearTimeout(managerSearchTimer);
+          managerSearchTimer = setTimeout(async () => {
+            try {
+              await loadManagers(q);
+            } catch (e) {
+              msg(e.message || String(e));
+            }
+          }, 220);
+        });
+
+        document.getElementById("createInvite").onclick = async () => {
+          msg("");
+          try {
+            const out = await APP.apiFetch(`/api/projects/${encodeURIComponent(id)}/invites`, {
+              method: "POST",
+              body: JSON.stringify({ days: 7, max_uses: 20 })
+            });
+            const link = `${window.location.origin}/manager/project-invite.html?token=${encodeURIComponent(out.invite.token)}`;
+            document.getElementById("inviteLink").value = link;
+            if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(link);
+            msg("Invite link created and copied.");
+          } catch (e) {
+            msg(e.message || String(e));
+          }
+        };
+
         document.getElementById("saveProject").onclick = async () => {
           msg("");
           try {
@@ -465,6 +777,13 @@
           }
         };
 
+        document.getElementById("toggleSettings").onclick = () => {
+          document.getElementById("projectSettingsCard").classList.toggle("hidden");
+          document.getElementById("assignedWritersCard").classList.toggle("hidden");
+        };
+        document.getElementById("raiseRequest").onclick = openRequestDialog;
+        document.getElementById("raiseRequestInline").onclick = openRequestDialog;
+
         document.getElementById("prevMonth").onclick = async () => {
           activeMonth = shiftMonth(activeMonth, -1);
           await loadArticleMonth();
@@ -481,8 +800,8 @@
         try {
           msg("");
           syncMonthSelect();
-          await Promise.all([loadProject(), refreshAssigned(), loadArticleMonth()]);
-          await loadWriters("");
+          await Promise.all([loadProject(), refreshAssigned(), refreshManagers(), loadArticleMonth(), refreshRequests()]);
+          await Promise.all([loadWriters(""), loadManagers("")]);
         } catch (e) {
           msg(e.message || String(e));
         }

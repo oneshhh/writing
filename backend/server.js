@@ -15,6 +15,9 @@ const notificationsRoutes = require("./routes/notifications");
 const exportRoutes = require("./routes/export");
 const deployRoutes = require("./routes/deploy");
 const profileRoutes = require("./routes/profile");
+const requestsRoutes = require("./routes/requests");
+const calendarRoutes = require("./routes/calendar");
+const messagesRoutes = require("./routes/messages");
 
 const app = express();
 
@@ -77,6 +80,9 @@ app.use("/api/payments", authenticate.required, paymentsRoutes);
 app.use("/api/notifications", authenticate.required, notificationsRoutes);
 app.use("/api/export", authenticate.required, exportRoutes);
 app.use("/api/profile", authenticate.required, profileRoutes);
+app.use("/api/requests", authenticate.required, requestsRoutes);
+app.use("/api/calendar", authenticate.required, calendarRoutes);
+app.use("/api/messages", authenticate.required, messagesRoutes);
 app.use("/api/deploy", deployRoutes);
 
 app.use((err, req, res, next) => {
