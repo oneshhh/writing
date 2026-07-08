@@ -137,6 +137,18 @@
     renderConversationList();
   }
 
+  async function openConversation(kind, id, title) {
+    state.active = { kind, id, title };
+    renderConversationList();
+    await loadMessages();
+    await loadConversations();
+    if (state.poll) clearInterval(state.poll);
+    state.poll = setInterval(async () => {
+      await loadMessages();
+      await loadConversations();
+    }, 3500);
+  }
+
   function contactItem(contact) {
     const active = state.active?.kind === "direct" && state.active?.id === contact.id;
     const name = contact.full_name || contact.email || "User";
@@ -209,15 +221,7 @@
         const kind = button.getAttribute("data-chat-kind");
         const id = button.getAttribute("data-chat-id");
         const title = button.querySelector("strong")?.textContent || "Conversation";
-        state.active = { kind, id, title };
-        renderConversationList();
-        await loadMessages();
-        await loadConversations();
-        if (state.poll) clearInterval(state.poll);
-        state.poll = setInterval(async () => {
-          await loadMessages();
-          await loadConversations();
-        }, 3500);
+        await openConversation(kind, id, title);
       };
     }
   }
@@ -368,4 +372,10 @@
   await heartbeat();
   state.presencePoll = setInterval(heartbeat, 30000);
   await loadConversations();
+  const firstContact = state.contacts.find((contact) => contact.public_key);
+  if (!state.active && firstContact) {
+    await openConversation("direct", firstContact.id, firstContact.full_name || firstContact.email || "Conversation");
+  } else if (!state.active && state.projects[0]) {
+    await openConversation("project", state.projects[0].id, state.projects[0].title || "Project room");
+  }
 })();
