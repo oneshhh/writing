@@ -14,39 +14,73 @@
   <body>
     <div class="topbar" id="topbar"></div>
     <div class="wrap wide">
-      <div class="grid">
-        <div class="card">
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-            <div>
-              <h3 style="margin:0">Project Planner</h3>
-              <div class="muted" id="rangeLabel" style="margin-top:6px">30-day project calendar</div>
-            </div>
-            <div class="right">
-              <select id="projectFilter" style="width:auto;min-width:220px"></select>
-              <button class="secondary" id="prevRange" type="button">Previous 30 days</button>
-              <button class="secondary" id="todayRange" type="button">Today</button>
-              <button class="secondary" id="nextRange" type="button">Next 30 days</button>
-            </div>
+      <main class="calendar-page">
+        <section class="calendar-hero">
+          <div>
+            <h1>Editorial Calendar</h1>
+            <p>Manage project approvals and request deadlines for the selected month.</p>
           </div>
-        </div>
-        <div class="card">
+          <div class="calendar-controls">
+            <select class="calendar-select" id="projectFilter"></select>
+            <div class="calendar-month-nav" aria-label="Calendar month navigation">
+              <button id="prevMonth" type="button" aria-label="Previous month">
+                <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
+              </button>
+              <strong id="monthLabel"></strong>
+              <button id="nextMonth" type="button" aria-label="Next month">
+                <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
+              </button>
+            </div>
+            <button class="secondary" id="todayRange" type="button">Today</button>
+          </div>
+        </section>
+
+        <section class="calendar-legend" aria-label="Calendar legend">
+          <span class="calendar-legend-item"><span class="planner-count">03</span> Articles approved</span>
+          <span class="calendar-legend-item"><span class="planner-due">02</span> Requests due</span>
+          <span class="calendar-legend-item"><span class="material-symbols-outlined" aria-hidden="true">edit_note</span> Manager note</span>
+        </section>
+
+        <section class="calendar-shell">
+          <div class="calendar-weekdays" aria-hidden="true">
+            <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+          </div>
           <div id="plannerGrid" class="planner-grid"></div>
-        </div>
-      </div>
+        </section>
+      </main>
     </div>
 
     <script>
       (async function () {
         const user = await APP.requireRole("manager");
         if (!user) return;
-        await renderTopbar({ role: user.role, links: [{ href: "/manager/dashboard.html", label: "Dashboard" }, { href: "/manager/projects.html", label: "Projects" }, { href: "/manager/review.html", label: "Review" }, { href: "/manager/payments.html", label: "Payments" }] });
+        await renderTopbar({ role: user.role, links: [] });
 
-        let start = new Date();
-        start.setHours(0, 0, 0, 0);
+        let cursor = new Date();
+        cursor = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
         const projectFilter = document.getElementById("projectFilter");
 
         function key(d) {
-          return d.toISOString().slice(0, 10);
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, "0");
+          const day = String(d.getDate()).padStart(2, "0");
+          return `${y}-${m}-${day}`;
+        }
+
+        function monthStart() {
+          return new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+        }
+
+        function monthDays() {
+          return new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
+        }
+
+        function mondayOffset(d) {
+          return (d.getDay() + 6) % 7;
+        }
+
+        function monthLabel() {
+          return cursor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
         }
 
         async function loadProjects() {
@@ -56,45 +90,67 @@
             .join("")}`;
         }
 
+        function dayCell(d, row, outside) {
+          const today = key(d) === key(new Date());
+          const approved = Number(row.approved || 0);
+          const due = Number(row.requests_due || 0);
+          return `<div class="planner-day ${outside ? "is-outside" : ""} ${today ? "is-today" : ""}">
+            <div class="planner-date-row">
+              <span class="planner-date">${d.getDate()}</span>
+              <span class="planner-metrics">
+                ${approved ? `<span class="planner-count">${approved}</span>` : ""}
+                ${due ? `<span class="planner-due">${due}</span>` : ""}
+              </span>
+            </div>
+            <div>
+              ${(row.notes || [])
+                .slice(0, 2)
+                .map((n) => `<span class="planner-note"><span class="material-symbols-outlined" aria-hidden="true">edit_note</span>${APP.escapeHtml(n.title)}</span>`)
+                .join("")}
+            </div>
+          </div>`;
+        }
+
         function render(days) {
           const map = new Map((days || []).map((day) => [day.date, day]));
+          const first = monthStart();
+          const leading = mondayOffset(first);
+          const totalDays = monthDays();
+          const totalCells = Math.ceil((leading + totalDays) / 7) * 7;
+          const gridStart = new Date(first);
+          gridStart.setDate(first.getDate() - leading);
           const cells = [];
-          for (let i = 0; i < 30; i += 1) {
-            const d = new Date(start);
-            d.setDate(start.getDate() + i);
+
+          for (let i = 0; i < totalCells; i += 1) {
+            const d = new Date(gridStart);
+            d.setDate(gridStart.getDate() + i);
             const dateKey = key(d);
+            const outside = d.getMonth() !== cursor.getMonth();
             const row = map.get(dateKey) || { date: dateKey, approved: 0, requests_due: 0, notes: [] };
-            cells.push(`<div class="planner-day">
-              <span class="planner-date">${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
-              <strong>${d.toLocaleDateString(undefined, { weekday: "short" })}</strong>
-              <span class="planner-metrics">
-                <span>${row.approved || 0} approved</span>
-                <span>${row.requests_due || 0} requests due</span>
-              </span>
-              ${(row.notes || []).map((n) => `<span class="planner-note">${APP.escapeHtml(n.title)}</span>`).join("")}
-            </div>`);
+            cells.push(dayCell(d, row, outside));
           }
+
           document.getElementById("plannerGrid").innerHTML = cells.join("");
-          document.getElementById("rangeLabel").textContent = `${key(start)} to ${key(new Date(start.getTime() + 29 * 86400000))}`;
+          document.getElementById("monthLabel").textContent = monthLabel();
         }
 
         async function load() {
           const project = projectFilter.value ? `&project_id=${encodeURIComponent(projectFilter.value)}` : "";
-          const out = await APP.apiFetch(`/api/calendar?start=${encodeURIComponent(key(start))}&days=30${project}`);
+          const out = await APP.apiFetch(`/api/calendar?start=${encodeURIComponent(key(monthStart()))}&days=${monthDays()}${project}`);
           render(out.days || []);
         }
 
-        document.getElementById("prevRange").onclick = async () => {
-          start.setDate(start.getDate() - 30);
+        document.getElementById("prevMonth").onclick = async () => {
+          cursor = new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1);
           await load();
         };
-        document.getElementById("nextRange").onclick = async () => {
-          start.setDate(start.getDate() + 30);
+        document.getElementById("nextMonth").onclick = async () => {
+          cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
           await load();
         };
         document.getElementById("todayRange").onclick = async () => {
-          start = new Date();
-          start.setHours(0, 0, 0, 0);
+          const today = new Date();
+          cursor = new Date(today.getFullYear(), today.getMonth(), 1);
           await load();
         };
         projectFilter.onchange = load;
