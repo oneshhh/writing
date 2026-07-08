@@ -14,140 +14,27 @@
   <body>
     <div class="topbar" id="topbar"></div>
     <div class="wrap wide">
-      <div class="grid">
-        <div class="card" style="grid-column: span 4">
-          <h2>Encrypted Messages</h2>
-          <label class="muted">Mode</label>
-          <select id="audience">
-            <option value="direct">Direct message</option>
-            <option value="project">Project room</option>
-          </select>
-          <div id="directPick" style="margin-top:10px">
-            <label class="muted">Recipient</label>
-            <select id="recipient"></select>
+      <div class="chat-shell">
+        <aside class="card">
+          <h2>Messages</h2>
+          <input id="chatSearch" placeholder="Search people or project rooms..." />
+          <div class="chat-list" id="conversationList" style="margin-top:12px"></div>
+        </aside>
+        <main class="card chat-thread">
+          <div>
+            <h3 id="chatTitle">Choose a conversation</h3>
+            <div class="muted">Messages are encrypted in your browser with public/private keys.</div>
           </div>
-          <div id="projectPick" style="margin-top:10px" class="hidden">
-            <label class="muted">Project</label>
-            <select id="project"></select>
+          <div class="chat-messages" id="messageList"></div>
+          <textarea id="messageText" placeholder="Type a message..." rows="3"></textarea>
+          <div class="right">
+            <span class="muted" id="msg"></span>
+            <button id="sendMessage" type="button">Send</button>
           </div>
-          <div style="margin-top:10px">
-            <label class="muted">Conversation key</label>
-            <input id="secret" type="password" placeholder="Shared key for this conversation" />
-            <div class="muted" style="margin-top:6px">Messages are encrypted before sending. People need the same key to read them.</div>
-          </div>
-          <div class="right" style="margin-top:12px">
-            <button class="secondary" id="loadThread" type="button">Load</button>
-          </div>
-        </div>
-        <div class="card" style="grid-column: span 8">
-          <h2>Thread</h2>
-          <div id="messages" style="display:grid;gap:10px;min-height:320px"></div>
-          <div style="margin-top:12px">
-            <textarea id="messageText" placeholder="Write a message..."></textarea>
-          </div>
-          <div class="right" style="margin-top:12px">
-            <button id="sendMessage" type="button">Send encrypted</button>
-          </div>
-          <div class="muted" id="msg" style="margin-top:10px"></div>
-        </div>
+        </main>
       </div>
     </div>
-    <script>
-      (async function () {
-        const user = await APP.requireRole("writer");
-        if (!user) return;
-        await renderTopbar({ role: user.role, links: [{ href: "/writer/dashboard.html", label: "Dashboard" }, { href: "/writer/earnings.html", label: "Earnings" }] });
-
-        const enc = new TextEncoder();
-        const dec = new TextDecoder();
-        const msg = (t) => (document.getElementById("msg").textContent = t || "");
-
-        function b64(bytes) {
-          return btoa(String.fromCharCode(...new Uint8Array(bytes)));
-        }
-        function fromB64(value) {
-          return Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
-        }
-        async function keyFromSecret(secret, salt) {
-          const material = await crypto.subtle.importKey("raw", enc.encode(secret), "PBKDF2", false, ["deriveKey"]);
-          return crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations: 120000, hash: "SHA-256" }, material, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
-        }
-        async function encryptText(text, secret) {
-          const salt = crypto.getRandomValues(new Uint8Array(16));
-          const iv = crypto.getRandomValues(new Uint8Array(12));
-          const key = await keyFromSecret(secret, salt);
-          const cipher = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, enc.encode(text));
-          return { cipher_text: b64(cipher), iv: b64(iv), salt: b64(salt), algorithm: "AES-GCM/PBKDF2" };
-        }
-        async function decryptText(row, secret) {
-          const key = await keyFromSecret(secret, fromB64(row.salt));
-          const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromB64(row.iv) }, key, fromB64(row.cipher_text));
-          return dec.decode(plain);
-        }
-
-        async function loadOptions() {
-          const [contacts, projects] = await Promise.all([APP.apiFetch("/api/messages/contacts"), APP.apiFetch("/api/projects")]);
-          document.getElementById("recipient").innerHTML = (contacts.users || []).map((u) => `<option value="${u.id}">${APP.escapeHtml(u.full_name || u.email)} (${APP.escapeHtml(u.role)})</option>`).join("");
-          document.getElementById("project").innerHTML = (projects.projects || []).map((p) => `<option value="${p.id}">${APP.escapeHtml(p.title || "Project")}</option>`).join("");
-        }
-
-        function syncMode() {
-          const isProject = document.getElementById("audience").value === "project";
-          document.getElementById("directPick").classList.toggle("hidden", isProject);
-          document.getElementById("projectPick").classList.toggle("hidden", !isProject);
-        }
-
-        async function loadThread() {
-          msg("");
-          const secret = document.getElementById("secret").value;
-          if (!secret) return msg("Enter the conversation key first.");
-          const isProject = document.getElementById("audience").value === "project";
-          const query = isProject ? `project_id=${encodeURIComponent(document.getElementById("project").value)}` : `recipient_id=${encodeURIComponent(document.getElementById("recipient").value)}`;
-          const out = await APP.apiFetch(`/api/messages?${query}`);
-          const rows = [];
-          for (const row of out.messages || []) {
-            let text = "[Could not decrypt with this key]";
-            try {
-              text = await decryptText(row, secret);
-            } catch {}
-            rows.push(`<div class="review-queue-item">
-              <div style="font-weight:800">${APP.escapeHtml(row.sender?.full_name || "User")}</div>
-              <div>${APP.escapeHtml(text)}</div>
-              <div class="muted">${APP.escapeHtml(new Date(row.created_at).toLocaleString())}</div>
-            </div>`);
-          }
-          document.getElementById("messages").innerHTML = rows.join("") || "<div class='muted'>No messages yet.</div>";
-        }
-
-        document.getElementById("audience").onchange = syncMode;
-        document.getElementById("loadThread").onclick = loadThread;
-        document.getElementById("sendMessage").onclick = async () => {
-          msg("");
-          try {
-            const secret = document.getElementById("secret").value;
-            const text = document.getElementById("messageText").value.trim();
-            if (!secret || !text) return msg("Enter a key and a message.");
-            const isProject = document.getElementById("audience").value === "project";
-            const payload = await encryptText(text, secret);
-            await APP.apiFetch("/api/messages", {
-              method: "POST",
-              body: JSON.stringify({
-                ...payload,
-                audience: isProject ? "project" : "direct",
-                project_id: isProject ? document.getElementById("project").value : null,
-                recipient_id: isProject ? null : document.getElementById("recipient").value
-              })
-            });
-            document.getElementById("messageText").value = "";
-            await loadThread();
-          } catch (e) {
-            msg(e.message || String(e));
-          }
-        };
-
-        await loadOptions();
-        syncMode();
-      })();
-    </script>
+    <script>window.RW_MESSAGES_ROLE = "writer";</script>
+    <script src="/shared/messages.js"></script>
   </body>
 </html>
