@@ -22,26 +22,54 @@ async function renderTopbar({ role, links }) {
     return "chevron_right";
   };
 
+  const standardLinksByRole = {
+    admin: [
+      { href: "/admin/dashboard.html", label: "Dashboard", icon: "dashboard" },
+      { href: "/admin/users.html", label: "Users", icon: "groups" },
+      { href: "/admin/projects.html", label: "Projects", icon: "folder_copy" },
+      { href: "/admin/payments.html", label: "Payments", icon: "payments" }
+    ],
+    manager: [
+      { href: "/manager/dashboard.html", label: "Dashboard", icon: "dashboard" },
+      { href: "/manager/projects.html", label: "Projects", icon: "folder_copy" },
+      { href: "/manager/review.html", label: "Review", icon: "fact_check" },
+      { href: "/manager/payments.html", label: "Payments", icon: "payments" },
+      { href: "/manager/calendar.html", label: "Calendar", icon: "calendar_month" },
+      { href: "/manager/messages.html", label: "Messages", icon: "forum" }
+    ],
+    writer: [
+      { href: "/writer/dashboard.html", label: "Dashboard", icon: "dashboard" },
+      { href: "/writer/submit.html", label: "Submit", icon: "edit" },
+      { href: "/writer/earnings.html", label: "Earnings", icon: "paid" },
+      { href: "/writer/calendar.html", label: "Calendar", icon: "calendar_month" },
+      { href: "/writer/messages.html", label: "Messages", icon: "forum" }
+    ]
+  };
+
+  const mergeLinks = (base, extra) => {
+    const seen = new Set();
+    return [...(base || []), ...(extra || [])]
+      .filter((item) => item?.href && item?.label)
+      .filter((item) => {
+        const key = String(item.href);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .map((l) => ({
+        href: l.href,
+        label: l.label,
+        icon: l.icon || guessIcon(l.label, l.href)
+      }));
+  };
+
   const rawTitle = String(document.title || "");
   const titleParts = rawTitle
     .split(/(?:\u2022|â€¢|•)/)
     .map((p) => p.trim())
     .filter(Boolean);
   const pageTitle = titleParts.length ? titleParts[titleParts.length - 1] : rawTitle;
-  const navLinks = (links || []).map((l) => ({
-    href: l.href,
-    label: l.label,
-    icon: l.icon || guessIcon(l.label, l.href)
-  }));
-  if (role === "manager" && !navLinks.some((l) => l.href === "/manager/calendar.html")) {
-    navLinks.push({ href: "/manager/calendar.html", label: "Calendar", icon: "calendar_month" });
-  }
-  if (role === "writer" && !navLinks.some((l) => l.href === "/writer/calendar.html")) {
-    navLinks.push({ href: "/writer/calendar.html", label: "Calendar", icon: "calendar_month" });
-  }
-  if ((role === "manager" || role === "writer") && !navLinks.some((l) => l.href === `/${role}/messages.html`)) {
-    navLinks.push({ href: `/${role}/messages.html`, label: "Messages", icon: "forum" });
-  }
+  const navLinks = mergeLinks(standardLinksByRole[role] || [], links || []);
   navLinks.push({ href: "/shared/notifications.html", label: "Notifications", icon: "notifications" });
   navLinks.push({ href: "/profile.html", label: "Profile", icon: "account_circle" });
 
@@ -165,23 +193,43 @@ async function renderTopbar({ role, links }) {
       });
   }
 
+  const updatePill = (pill, count, bg) => {
+    if (!pill) return;
+    if (count > 0) {
+      pill.textContent = count > 99 ? "99+" : String(count);
+      pill.classList.remove("hidden");
+      pill.style.cssText = `margin-left:auto;min-width:22px;height:22px;padding:0 7px;border-radius:999px;background:${bg};color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;`;
+    } else {
+      pill.classList.add("hidden");
+    }
+  };
+
   const messageBadge = document.getElementById("rwMessageCount");
-  if (role && messageBadge) {
-    APP.apiFetch("/api/messages/unread-count", { skipLoader: true })
-      .then((data) => {
+  if (role && messageBadge && (role === "manager" || role === "writer")) {
+    let lastUnread = null;
+    let polling = false;
+    const pollMessages = () => {
+      if (polling) return;
+      polling = true;
+      APP.apiFetch("/api/messages/unread-count", { skipLoader: true })
+        .then((data) => {
         const unread = Number(data.unread || 0);
-        if (unread > 0) {
-          messageBadge.textContent = unread > 99 ? "99+" : String(unread);
-          messageBadge.classList.remove("hidden");
-          messageBadge.style.cssText =
-            "margin-left:auto;min-width:22px;height:22px;padding:0 7px;border-radius:999px;background:#0d6efd;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;";
-        } else {
-          messageBadge.classList.add("hidden");
+        updatePill(messageBadge, unread, "#0d6efd");
+        if (lastUnread != null && unread > lastUnread && window.location.pathname !== `/${role}/messages.html`) {
+          APP.ui?.toast?.(`${unread - lastUnread} new message${unread - lastUnread === 1 ? "" : "s"}`, { kind: "success", ttlMs: 3200 });
         }
+        lastUnread = unread;
       })
       .catch(() => {
         messageBadge.classList.add("hidden");
+      })
+      .finally(() => {
+        polling = false;
       });
+    };
+    pollMessages();
+    if (window.__rwMessageBadgePoll) clearInterval(window.__rwMessageBadgePoll);
+    window.__rwMessageBadgePoll = setInterval(pollMessages, 3000);
   }
 
   if (role) document.title = `${String(role).toUpperCase()} \u2022 ${pageTitle || rawTitle}`;
