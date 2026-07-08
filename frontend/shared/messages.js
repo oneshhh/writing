@@ -63,6 +63,17 @@
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }
 
+  function dayLabel(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+    if (date.toDateString() === today.toDateString()) return "Today";
+    if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+    return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  }
+
   function presenceLabel(lastActiveAt) {
     if (!lastActiveAt) return "Not active yet";
     const diff = Date.now() - new Date(lastActiveAt).getTime();
@@ -154,6 +165,27 @@
     </button>`;
   }
 
+  function activeDetails() {
+    if (!state.active) return null;
+    if (state.active.kind === "project") {
+      const project = state.projects.find((item) => item.id === state.active.id);
+      return {
+        title: state.active.title,
+        avatar: "#",
+        avatarClass: "room",
+        subtitle: `Project room - encrypted for members${project?.status ? ` - ${project.status}` : ""}`
+      };
+    }
+    const contact = state.contacts.find((item) => item.id === state.active.id);
+    const name = contact?.full_name || contact?.email || state.active.title;
+    return {
+      title: name,
+      avatar: initials(name),
+      avatarClass: presenceClass(contact?.last_active_at),
+      subtitle: `Direct chat - encrypted - ${presenceLabel(contact?.last_active_at)}`
+    };
+  }
+
   function renderConversationList() {
     const q = String($("chatSearch").value || "").toLowerCase();
     const contacts = state.contacts.filter((item) => `${item.full_name || ""} ${item.email || ""} ${item.role || ""}`.toLowerCase().includes(q));
@@ -234,11 +266,12 @@
 
   async function loadMessages() {
     if (!state.active) return;
-    $("chatTitle").textContent = state.active.title;
-    $("chatSubtitle").textContent =
-      state.active.kind === "project"
-        ? "Project room - encrypted for project members"
-        : "Direct chat - only people in your organisation can message you";
+    const active = activeDetails();
+    $("chatTitle").textContent = active.title;
+    $("chatSubtitle").textContent = active.subtitle;
+    const avatar = $("chatHeaderAvatar");
+    avatar.textContent = active.avatar;
+    avatar.className = `chat-avatar ${active.avatarClass || ""}`;
     $("chatComposer").classList.remove("hidden");
     const query =
       state.active.kind === "project"
@@ -246,22 +279,30 @@
         : `recipient_id=${encodeURIComponent(state.active.id)}`;
     const out = await APP.apiFetch(`/api/messages?${query}`, { skipLoader: true });
     const rows = [];
+    let lastDay = "";
     for (const row of out.messages || []) {
       let text = "[Could not decrypt on this device]";
       try {
         text = await decryptMessage(row);
       } catch {}
       const mine = row.sender_id === user.id;
-      rows.push(`<div class="chat-bubble ${mine ? "mine" : ""}">
-        <div>${APP.escapeHtml(text)}</div>
-        <span class="chat-meta">
-          <span>${APP.escapeHtml(row.sender?.full_name || (mine ? "You" : "User"))} - ${APP.escapeHtml(timeLabel(row.created_at))}</span>
-          ${mine ? statusDot(row.delivery_status) : ""}
-        </span>
+      const currentDay = dayLabel(row.created_at);
+      if (currentDay && currentDay !== lastDay) {
+        rows.push(`<div class="chat-date-divider"><span>${APP.escapeHtml(currentDay)}</span></div>`);
+        lastDay = currentDay;
+      }
+      rows.push(`<div class="chat-message-row ${mine ? "mine" : ""}">
+        ${mine ? "" : `<span class="chat-mini-avatar">${APP.escapeHtml(initials(row.sender?.full_name || "User"))}</span>`}
+        <div class="chat-bubble ${mine ? "mine" : ""}">
+          <span class="chat-sender">${APP.escapeHtml(row.sender?.full_name || (mine ? "You" : "User"))} - ${APP.escapeHtml(timeLabel(row.created_at))}</span>
+          <div>${APP.escapeHtml(text)}</div>
+          ${mine ? `<span class="chat-meta">${statusDot(row.delivery_status)}</span>` : ""}
+        </div>
       </div>`);
     }
     const list = $("messageList");
-    list.innerHTML = rows.join("") || "<div class='chat-empty-state'>No messages yet. Start the conversation.</div>";
+    const lockNotice = `<div class="chat-lock-note"><span class="material-symbols-outlined" aria-hidden="true">lock</span><span>Messages are encrypted with public/private keys.</span></div>`;
+    list.innerHTML = rows.length ? `${rows.join("")}${lockNotice}` : "<div class='chat-empty-state'>No messages yet. Start the conversation.</div>";
     list.scrollTop = list.scrollHeight;
   }
 
@@ -306,6 +347,16 @@
 
   $("chatSearch").addEventListener("input", renderConversationList);
   $("sendMessage").onclick = sendMessage;
+  for (const button of document.querySelectorAll(".coming-soon")) {
+    button.addEventListener("click", () => {
+      APP.ui?.toast?.(button.getAttribute("data-coming-soon") || "Coming soon", { kind: "success", ttlMs: 2600 });
+    });
+  }
+  $("messageText").addEventListener("input", () => {
+    const input = $("messageText");
+    input.style.height = "auto";
+    input.style.height = `${Math.min(input.scrollHeight, 140)}px`;
+  });
   $("messageText").addEventListener("keydown", (event) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();

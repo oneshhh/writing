@@ -28,14 +28,51 @@
         </aside>
         <main class="card chat-thread">
           <div class="chat-thread-head">
-            <h3 id="chatTitle">Choose a conversation</h3>
-            <div class="muted" id="chatSubtitle">Select a person from the left to open a private room.</div>
+            <div class="chat-thread-identity">
+              <span class="chat-avatar room" id="chatHeaderAvatar">#</span>
+              <div>
+                <h3 id="chatTitle">Choose a conversation</h3>
+                <div class="muted" id="chatSubtitle">Select a person from the left to open a private room.</div>
+              </div>
+            </div>
+            <div class="chat-thread-actions">
+              <button class="chat-tool coming-soon" type="button" data-coming-soon="Video calls are coming soon" title="Coming soon">
+                <span class="material-symbols-outlined" aria-hidden="true">videocam</span>
+              </button>
+              <button class="chat-tool coming-soon" type="button" data-coming-soon="Voice calls are coming soon" title="Coming soon">
+                <span class="material-symbols-outlined" aria-hidden="true">call</span>
+              </button>
+              <button class="chat-tool coming-soon" type="button" data-coming-soon="More chat actions are coming soon" title="Coming soon">
+                <span class="material-symbols-outlined" aria-hidden="true">more_vert</span>
+              </button>
+            </div>
           </div>
           <div class="chat-messages" id="messageList"></div>
           <div class="chat-composer hidden" id="chatComposer">
-            <textarea id="messageText" placeholder="Type a message..." rows="3"></textarea>
-            <span class="muted" id="msg"></span>
-            <button id="sendMessage" type="button">Send</button>
+            <div class="chat-compose-box">
+              <textarea id="messageText" placeholder="Type a message..." rows="1"></textarea>
+              <div class="chat-compose-tools">
+                <div class="chat-tool-group">
+                  <button class="chat-tool coming-soon" type="button" data-coming-soon="File attachments are coming soon" title="Coming soon">
+                    <span class="material-symbols-outlined" aria-hidden="true">attach_file</span>
+                  </button>
+                  <button class="chat-tool coming-soon" type="button" data-coming-soon="Emoji reactions are coming soon" title="Coming soon">
+                    <span class="material-symbols-outlined" aria-hidden="true">sentiment_satisfied</span>
+                  </button>
+                  <button class="chat-tool coming-soon" type="button" data-coming-soon="Rich text formatting is coming soon" title="Coming soon">
+                    <span class="material-symbols-outlined" aria-hidden="true">format_bold</span>
+                  </button>
+                  <span class="chat-tool-divider"></span>
+                  <button class="chat-tool coming-soon" type="button" data-coming-soon="Voice notes are coming soon" title="Coming soon">
+                    <span class="material-symbols-outlined" aria-hidden="true">mic</span>
+                  </button>
+                </div>
+                <button id="sendMessage" type="button" aria-label="Send message">
+                  <span class="material-symbols-outlined" aria-hidden="true">send</span>
+                </button>
+              </div>
+            </div>
+            <span class="muted" id="msg">Press Enter to send. Shift+Enter for a new line.</span>
           </div>
         </main>
       </div>
