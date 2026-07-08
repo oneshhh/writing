@@ -19,6 +19,8 @@ create table if not exists public.organization_members (
 );
 
 alter table public.users add column if not exists organization_id uuid references public.organizations(id) on delete set null;
+alter table public.users add column if not exists public_key_jwk jsonb;
+alter table public.users add column if not exists public_key_updated_at timestamptz;
 alter table public.projects add column if not exists organization_id uuid references public.organizations(id) on delete set null;
 
 create table if not exists public.project_requests (
@@ -84,6 +86,7 @@ create table if not exists public.encrypted_messages (
   iv text not null,
   salt text not null,
   algorithm text not null default 'AES-GCM/RSA-OAEP-256',
+  encrypted_keys jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
 
@@ -99,21 +102,37 @@ create index if not exists encrypted_messages_project_id_idx
 alter table public.encrypted_messages
   alter column algorithm set default 'AES-GCM/RSA-OAEP-256';
 
-create table if not exists public.user_public_keys (
-  user_id uuid primary key references public.users(id) on delete cascade,
-  public_key_jwk jsonb not null,
-  algorithm text not null default 'RSA-OAEP-256',
-  updated_at timestamptz not null default now()
-);
+alter table public.encrypted_messages
+  add column if not exists encrypted_keys jsonb not null default '{}'::jsonb;
 
-create table if not exists public.encrypted_message_keys (
-  id uuid primary key default gen_random_uuid(),
-  message_id uuid not null references public.encrypted_messages(id) on delete cascade,
-  user_id uuid not null references public.users(id) on delete cascade,
-  encrypted_key text not null,
-  created_at timestamptz not null default now(),
-  unique (message_id, user_id)
-);
+do $$
+begin
+  if to_regclass('public.user_public_keys') is not null then
+    execute $migrate_user_keys$
+      update public.users u
+      set
+        public_key_jwk = k.public_key_jwk,
+        public_key_updated_at = coalesce(k.updated_at, now())
+      from public.user_public_keys k
+      where u.id = k.user_id
+        and u.public_key_jwk is null
+    $migrate_user_keys$;
+  end if;
 
-create index if not exists encrypted_message_keys_user_id_idx
-  on public.encrypted_message_keys(user_id);
+  if to_regclass('public.encrypted_message_keys') is not null then
+    execute $migrate_message_keys$
+      update public.encrypted_messages m
+      set encrypted_keys = coalesce(m.encrypted_keys, '{}'::jsonb) || k.keys
+      from (
+        select message_id, jsonb_object_agg(user_id::text, encrypted_key) as keys
+        from public.encrypted_message_keys
+        group by message_id
+      ) k
+      where m.id = k.message_id
+    $migrate_message_keys$;
+  end if;
+end $$;
+
+-- Optional cleanup after confirming old messages/keys are no longer needed:
+-- drop table if exists public.encrypted_message_keys;
+-- drop table if exists public.user_public_keys;

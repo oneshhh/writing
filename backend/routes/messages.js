@@ -37,19 +37,36 @@ async function canAccessProject(db, user, projectId) {
 }
 
 async function hydratePublicKeys(db, users) {
-  const ids = (users || []).map((user) => user.id).filter(Boolean);
-  if (!ids.length) return [];
-  const { data: keys, error } = await db.from("user_public_keys").select("user_id,public_key_jwk,algorithm,updated_at").in("user_id", ids);
-  if (error) throw new Error(error.message);
-  const keyMap = new Map((keys || []).map((key) => [key.user_id, key]));
-  return (users || []).map((user) => ({ ...user, public_key: keyMap.get(user.id) || null }));
+  return (users || []).map((user) => ({
+    ...user,
+    public_key: user.public_key_jwk
+      ? {
+          user_id: user.id,
+          public_key_jwk: user.public_key_jwk,
+          algorithm: "RSA-OAEP-256",
+          updated_at: user.public_key_updated_at || null
+        }
+      : null
+  }));
 }
 
 router.get("/keys/me", authorizeRoles("writer", "manager", "admin"), async (req, res) => {
   const db = getSupabaseAdmin();
-  const { data, error } = await db.from("user_public_keys").select("*").eq("user_id", req.auth.user.id).maybeSingle();
+  const { data, error } = await db
+    .from("users")
+    .select("id,public_key_jwk,public_key_updated_at")
+    .eq("id", req.auth.user.id)
+    .maybeSingle();
   if (error) return res.status(400).json({ error: error.message });
-  return res.json({ key: data || null });
+  const key = data?.public_key_jwk
+    ? {
+        user_id: data.id,
+        public_key_jwk: data.public_key_jwk,
+        algorithm: "RSA-OAEP-256",
+        updated_at: data.public_key_updated_at || null
+      }
+    : null;
+  return res.json({ key });
 });
 
 router.post("/keys", authorizeRoles("writer", "manager", "admin"), async (req, res) => {
@@ -57,19 +74,27 @@ router.post("/keys", authorizeRoles("writer", "manager", "admin"), async (req, r
   if (!publicKey || typeof publicKey !== "object") return res.status(400).json({ error: "public_key_jwk is required" });
   const db = getSupabaseAdmin();
   const { data, error } = await db
-    .from("user_public_keys")
-    .upsert([{ user_id: req.auth.user.id, public_key_jwk: publicKey, algorithm: "RSA-OAEP-256", updated_at: new Date().toISOString() }])
-    .select("*")
+    .from("users")
+    .update({ public_key_jwk: publicKey, public_key_updated_at: new Date().toISOString() })
+    .eq("id", req.auth.user.id)
+    .select("id,public_key_jwk,public_key_updated_at")
     .single();
   if (error) return res.status(400).json({ error: error.message });
-  return res.json({ key: data });
+  return res.json({
+    key: {
+      user_id: data.id,
+      public_key_jwk: data.public_key_jwk,
+      algorithm: "RSA-OAEP-256",
+      updated_at: data.public_key_updated_at || null
+    }
+  });
 });
 
 router.get("/contacts", authorizeRoles("writer", "manager", "admin"), async (req, res) => {
   const db = getSupabaseAdmin();
   const q = String(req.query.q || "").trim();
   const projectId = req.query.project_id ? String(req.query.project_id) : null;
-  const select = "id,unique_id,email,full_name,role,is_active";
+  const select = "id,unique_id,email,full_name,role,is_active,public_key_jwk,public_key_updated_at";
 
   try {
     if (projectId) {
@@ -98,7 +123,7 @@ router.get("/conversations", authorizeRoles("writer", "manager", "admin"), async
   try {
     const usersQuery = await db
       .from("users")
-      .select("id,unique_id,email,full_name,role,is_active")
+      .select("id,unique_id,email,full_name,role,is_active,public_key_jwk,public_key_updated_at")
       .eq("is_active", true)
       .neq("id", user.id)
       .order("full_name", { ascending: true })
@@ -153,19 +178,12 @@ router.get("/", authorizeRoles("writer", "manager", "admin"), async (req, res) =
     const { data, error } = await q;
     if (error) return res.status(400).json({ error: error.message });
 
-    const ids = (data || []).map((row) => row.id);
-    let keyMap = new Map();
-    if (ids.length) {
-      const { data: keys, error: keyErr } = await db
-        .from("encrypted_message_keys")
-        .select("message_id,encrypted_key")
-        .in("message_id", ids)
-        .eq("user_id", user.id);
-      if (keyErr) return res.status(400).json({ error: keyErr.message });
-      keyMap = new Map((keys || []).map((key) => [key.message_id, key.encrypted_key]));
-    }
-
-    return res.json({ messages: (data || []).map((row) => ({ ...row, encrypted_key: keyMap.get(row.id) || null })) });
+    return res.json({
+      messages: (data || []).map((row) => ({
+        ...row,
+        encrypted_key: row.encrypted_keys?.[user.id] || null
+      }))
+    });
   } catch (e) {
     return res.status(e.status || 400).json({ error: e.message || String(e) });
   }
@@ -180,6 +198,14 @@ router.post("/", authorizeRoles("writer", "manager", "admin"), async (req, res) 
 
   try {
     const isProject = audience === "project";
+    const encryptedKeys = keys.reduce((acc, key) => {
+      if (key?.user_id && key?.encrypted_key) acc[key.user_id] = key.encrypted_key;
+      return acc;
+    }, {});
+    if (!encryptedKeys[req.auth.user.id]) {
+      return res.status(400).json({ error: "Sender encrypted key is required" });
+    }
+
     if (isProject) {
       if (!project_id) return res.status(400).json({ error: "project_id is required for project messages" });
       const allowed = await canAccessProject(db, req.auth.user, project_id);
@@ -200,21 +226,13 @@ router.post("/", authorizeRoles("writer", "manager", "admin"), async (req, res) 
           cipher_text,
           iv,
           salt: "",
-          algorithm: algorithm || "AES-GCM/RSA-OAEP-256"
+          algorithm: algorithm || "AES-GCM/RSA-OAEP-256",
+          encrypted_keys: encryptedKeys
         }
       ])
       .select("*")
       .single();
     if (error) throw new Error(error.message);
-
-    const keyRows = keys
-      .filter((key) => key?.user_id && key?.encrypted_key)
-      .map((key) => ({ message_id: data.id, user_id: key.user_id, encrypted_key: key.encrypted_key }));
-    if (!keyRows.some((key) => key.user_id === req.auth.user.id)) {
-      return res.status(400).json({ error: "Sender encrypted key is required" });
-    }
-    const { error: keyErr } = await db.from("encrypted_message_keys").insert(keyRows);
-    if (keyErr) throw new Error(keyErr.message);
 
     return res.json({ message: data });
   } catch (e) {
