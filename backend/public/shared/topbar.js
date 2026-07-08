@@ -74,6 +74,7 @@ async function renderTopbar({ role, links }) {
           <a href="${l.href}" class="${isActive(l.href) ? "active" : ""}">
             <span class="material-symbols-outlined" aria-hidden="true">${l.icon}</span>
             <span>${APP.escapeHtml(l.label)}</span>
+            ${l.href === `/${role}/messages.html` ? `<span class="rw-nav-pill hidden" id="rwMessageCount"></span>` : ""}
             ${l.href === "/shared/notifications.html" ? `<span class="rw-nav-pill hidden" id="rwNotificationCount"></span>` : ""}
           </a>
         `
@@ -161,6 +162,25 @@ async function renderTopbar({ role, links }) {
       })
       .catch(() => {
         unreadBadge.classList.add("hidden");
+      });
+  }
+
+  const messageBadge = document.getElementById("rwMessageCount");
+  if (role && messageBadge) {
+    APP.apiFetch("/api/messages/unread-count", { skipLoader: true })
+      .then((data) => {
+        const unread = Number(data.unread || 0);
+        if (unread > 0) {
+          messageBadge.textContent = unread > 99 ? "99+" : String(unread);
+          messageBadge.classList.remove("hidden");
+          messageBadge.style.cssText =
+            "margin-left:auto;min-width:22px;height:22px;padding:0 7px;border-radius:999px;background:#0d6efd;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;";
+        } else {
+          messageBadge.classList.add("hidden");
+        }
+      })
+      .catch(() => {
+        messageBadge.classList.add("hidden");
       });
   }
 

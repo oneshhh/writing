@@ -15,19 +15,25 @@
     <div class="topbar" id="topbar"></div>
     <div class="wrap wide">
       <div class="chat-shell">
-        <aside class="card">
-          <h2>Messages</h2>
+        <aside class="card chat-panel">
+          <div class="chat-panel-head">
+            <span class="material-symbols-outlined" aria-hidden="true">forum</span>
+            <div>
+              <h2>Messages</h2>
+              <p>People in your organisation</p>
+            </div>
+          </div>
           <input id="chatSearch" placeholder="Search people or project rooms..." />
           <div class="chat-list" id="conversationList" style="margin-top:12px"></div>
         </aside>
         <main class="card chat-thread">
-          <div>
+          <div class="chat-thread-head">
             <h3 id="chatTitle">Choose a conversation</h3>
-            <div class="muted">Messages are encrypted in your browser with public/private keys.</div>
+            <div class="muted" id="chatSubtitle">Select a person from the left to open a private room.</div>
           </div>
           <div class="chat-messages" id="messageList"></div>
-          <textarea id="messageText" placeholder="Type a message..." rows="3"></textarea>
-          <div class="right">
+          <div class="chat-composer hidden" id="chatComposer">
+            <textarea id="messageText" placeholder="Type a message..." rows="3"></textarea>
             <span class="muted" id="msg"></span>
             <button id="sendMessage" type="button">Send</button>
           </div>

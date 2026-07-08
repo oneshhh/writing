@@ -21,6 +21,7 @@ create table if not exists public.organization_members (
 alter table public.users add column if not exists organization_id uuid references public.organizations(id) on delete set null;
 alter table public.users add column if not exists public_key_jwk jsonb;
 alter table public.users add column if not exists public_key_updated_at timestamptz;
+alter table public.users add column if not exists last_active_at timestamptz;
 alter table public.projects add column if not exists organization_id uuid references public.organizations(id) on delete set null;
 
 create table if not exists public.project_requests (
@@ -87,6 +88,8 @@ create table if not exists public.encrypted_messages (
   salt text not null,
   algorithm text not null default 'AES-GCM/RSA-OAEP-256',
   encrypted_keys jsonb not null default '{}'::jsonb,
+  delivery_status text not null default 'delivered' check (delivery_status in ('delivered', 'read', 'failed')),
+  read_by jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
 
@@ -104,6 +107,26 @@ alter table public.encrypted_messages
 
 alter table public.encrypted_messages
   add column if not exists encrypted_keys jsonb not null default '{}'::jsonb;
+
+alter table public.encrypted_messages
+  add column if not exists delivery_status text not null default 'delivered';
+
+alter table public.encrypted_messages
+  add column if not exists read_by jsonb not null default '{}'::jsonb;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'encrypted_messages_delivery_status_check'
+      and conrelid = 'public.encrypted_messages'::regclass
+  ) then
+    alter table public.encrypted_messages
+      add constraint encrypted_messages_delivery_status_check
+      check (delivery_status in ('delivered', 'read', 'failed'));
+  end if;
+end $$;
 
 do $$
 begin
@@ -132,6 +155,8 @@ begin
     $migrate_message_keys$;
   end if;
 end $$;
+
+notify pgrst, 'reload schema';
 
 -- Optional cleanup after confirming old messages/keys are no longer needed:
 -- drop table if exists public.encrypted_message_keys;
