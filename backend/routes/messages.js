@@ -226,15 +226,22 @@ router.post("/", authorizeRoles("writer", "manager", "admin"), async (req, res) 
           cipher_text,
           iv,
           salt: "",
-          algorithm: algorithm || "AES-GCM/RSA-OAEP-256",
-          encrypted_keys: encryptedKeys
+          algorithm: algorithm || "AES-GCM/RSA-OAEP-256"
         }
       ])
-      .select("*")
+      .select("id,sender_id,recipient_id,project_id,organization_id,audience,cipher_text,iv,salt,algorithm,created_at")
       .single();
     if (error) throw new Error(error.message);
 
-    return res.json({ message: data });
+    const { data: updated, error: updateErr } = await db
+      .from("encrypted_messages")
+      .update({ encrypted_keys: encryptedKeys })
+      .eq("id", data.id)
+      .select("*")
+      .single();
+    if (updateErr) throw new Error(updateErr.message);
+
+    return res.json({ message: updated });
   } catch (e) {
     return res.status(e.status || 400).json({ error: e.message || String(e) });
   }
