@@ -31,6 +31,9 @@
     publicKeyJwk: null
   };
 
+  const defaultThreadTitle = "Select a chat";
+  const defaultThreadSubtitle = "Choose a conversation on the left to continue messaging.";
+
   const $ = (id) => document.getElementById(id);
   const msg = (text) => {
     $("msg").textContent = text || "";
@@ -203,16 +206,16 @@
     const contacts = state.contacts.filter((item) => `${item.full_name || ""} ${item.email || ""} ${item.role || ""}`.toLowerCase().includes(q));
     const projects = state.projects.filter((item) => `${item.title || ""} project room`.toLowerCase().includes(q));
     $("conversationList").innerHTML = `
-      <div class="chat-list-section">People</div>
-      ${
-        contacts.length
-          ? contacts.map(contactItem).join("")
-          : "<div class='chat-empty-list'>No people found in your organisation.</div>"
-      }
+      <div class="chat-list-section">Project Rooms</div>
       ${
         projects.length
-          ? `<div class="chat-list-section">Project Rooms</div>${projects.map(projectItem).join("")}`
-          : ""
+          ? projects.map(projectItem).join("")
+          : "<div class='chat-empty-list'>No project rooms found.</div>"
+      }
+      ${
+        contacts.length
+          ? `<div class="chat-list-section">People</div>${contacts.map(contactItem).join("")}`
+          : "<div class='chat-list-section'>People</div><div class='chat-empty-list'>No people found in your organisation.</div>"
       }
     `;
 
@@ -224,6 +227,24 @@
         await openConversation(kind, id, title);
       };
     }
+  }
+
+  function renderEmptyThread() {
+    $("chatTitle").textContent = defaultThreadTitle;
+    $("chatSubtitle").textContent = defaultThreadSubtitle;
+    const avatar = $("chatHeaderAvatar");
+    avatar.textContent = "#";
+    avatar.className = "chat-avatar room";
+    $("chatComposer").classList.add("hidden");
+    $("messageList").innerHTML = `
+      <div class="chat-empty-stage">
+        <div class="chat-empty-stage-icon">
+          <span class="material-symbols-outlined" aria-hidden="true">chat_bubble</span>
+        </div>
+        <h4>Select a chat to continue messaging.</h4>
+        <p>Pick a project room or person from the left to open the conversation here.</p>
+      </div>
+    `;
   }
 
   async function recipientsForActive() {
@@ -269,7 +290,10 @@
   }
 
   async function loadMessages() {
-    if (!state.active) return;
+    if (!state.active) {
+      renderEmptyThread();
+      return;
+    }
     const active = activeDetails();
     $("chatTitle").textContent = active.title;
     $("chatSubtitle").textContent = active.subtitle;
@@ -372,10 +396,5 @@
   await heartbeat();
   state.presencePoll = setInterval(heartbeat, 30000);
   await loadConversations();
-  const firstContact = state.contacts.find((contact) => contact.public_key);
-  if (!state.active && firstContact) {
-    await openConversation("direct", firstContact.id, firstContact.full_name || firstContact.email || "Conversation");
-  } else if (!state.active && state.projects[0]) {
-    await openConversation("project", state.projects[0].id, state.projects[0].title || "Project room");
-  }
+  renderEmptyThread();
 })();

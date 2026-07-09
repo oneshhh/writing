@@ -6,7 +6,7 @@
     <link rel="icon" type="image/png" href="/assets/realwrite-logo.png" />
     <link rel="apple-touch-icon" href="/assets/realwrite-logo.png" />
     <title>Real Write - Writer Messages</title>
-    <link rel="stylesheet" href="/assets/styles.css?v=messages-ui-20260708-2" />
+    <link rel="stylesheet" href="/assets/styles.css?v=messages-ui-20260709-1" />
     <script src="/shared/config.js"></script>
     <script src="/shared/app.js"></script>
     <script src="/shared/topbar.js"></script>
@@ -17,13 +17,15 @@
       <div class="chat-shell">
         <aside class="card chat-panel">
           <div class="chat-panel-head">
-            <span class="material-symbols-outlined" aria-hidden="true">forum</span>
             <div>
               <h2>Messages</h2>
-              <p>People in your organisation</p>
+              <p>Project rooms and people</p>
             </div>
           </div>
-          <input id="chatSearch" placeholder="Search people or project rooms..." />
+          <div class="chat-search-wrap">
+            <span class="material-symbols-outlined" aria-hidden="true">search</span>
+            <input id="chatSearch" placeholder="Search people or project rooms..." />
+          </div>
           <div class="chat-list" id="conversationList" style="margin-top:12px"></div>
         </aside>
         <main class="card chat-thread">
@@ -31,8 +33,8 @@
             <div class="chat-thread-identity">
               <span class="chat-avatar room" id="chatHeaderAvatar">#</span>
               <div>
-                <h3 id="chatTitle">Choose a conversation</h3>
-                <div class="muted" id="chatSubtitle">Select a person from the left to open a private room.</div>
+                <h3 id="chatTitle">Select a chat</h3>
+                <div class="muted" id="chatSubtitle">Choose a conversation on the left to continue messaging.</div>
               </div>
             </div>
             <div class="chat-thread-actions">
@@ -78,6 +80,6 @@
       </div>
     </div>
     <script>window.RW_MESSAGES_ROLE = "writer";</script>
-    <script src="/shared/messages.js?v=messages-ui-20260708-2"></script>
+    <script src="/shared/messages.js?v=messages-ui-20260709-1"></script>
   </body>
 </html>
