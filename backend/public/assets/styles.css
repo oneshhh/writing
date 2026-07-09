@@ -1679,6 +1679,11 @@ button.planner-day {
   box-shadow: 0 24px 56px rgba(17, 24, 39, 0.06);
 }
 
+.chat-shell > * {
+  grid-column: auto;
+  min-width: 0;
+}
+
 .chat-panel {
   min-width: 0;
   overflow: hidden;
