@@ -17,13 +17,15 @@
       <div class="chat-shell">
         <aside class="card chat-panel">
           <div class="chat-panel-head">
-            <span class="material-symbols-outlined" aria-hidden="true">forum</span>
             <div>
               <h2>Messages</h2>
-              <p>People in your organisation</p>
+              <p>Project rooms and people</p>
             </div>
           </div>
-          <input id="chatSearch" placeholder="Search people or project rooms..." />
+          <div class="chat-search-wrap">
+            <span class="material-symbols-outlined" aria-hidden="true">search</span>
+            <input id="chatSearch" placeholder="Search people or project rooms..." />
+          </div>
           <div class="chat-list" id="conversationList" style="margin-top:12px"></div>
         </aside>
         <main class="card chat-thread">
@@ -31,8 +33,8 @@
             <div class="chat-thread-identity">
               <span class="chat-avatar room" id="chatHeaderAvatar">#</span>
               <div>
-                <h3 id="chatTitle">Choose a conversation</h3>
-                <div class="muted" id="chatSubtitle">Select a person from the left to open a private room.</div>
+                <h3 id="chatTitle">Select a chat</h3>
+                <div class="muted" id="chatSubtitle">Choose a conversation on the left to continue messaging.</div>
               </div>
             </div>
             <div class="chat-thread-actions">
