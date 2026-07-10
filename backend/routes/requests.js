@@ -76,6 +76,22 @@ async function hydrateRequests(db, requests) {
   return (requests || []).map((request) => ({ ...request, recipients: grouped.get(request.id) || [] }));
 }
 
+async function getWriterRequestArticles(db, writerId, requestIds) {
+  if (!requestIds.length) return new Map();
+  const { data, error } = await db
+    .from("articles")
+    .select("id,request_id,title,status,updated_at,request_title")
+    .eq("writer_id", writerId)
+    .in("request_id", requestIds)
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  const map = new Map();
+  for (const row of data || []) {
+    if (row.request_id && !map.has(row.request_id)) map.set(row.request_id, row);
+  }
+  return map;
+}
+
 router.get("/", authorizeRoles("manager", "writer", "admin"), async (req, res) => {
   const db = getSupabaseAdmin();
   const user = req.auth.user;
@@ -85,7 +101,7 @@ router.get("/", authorizeRoles("manager", "writer", "admin"), async (req, res) =
     if (user.role === "writer") {
       let q = db
         .from("project_request_recipients")
-        .select("id,status,responded_at,response_note,project_requests(*)")
+        .select("id,status,responded_at,response_note,submitted_at,fulfilled_at,linked_article_id,project_requests(*)")
         .eq("writer_id", user.id)
         .order("created_at", { ascending: false });
       const { data, error } = await q;
@@ -94,7 +110,19 @@ router.get("/", authorizeRoles("manager", "writer", "admin"), async (req, res) =
         ...row.project_requests,
         recipient_status: row.status,
         responded_at: row.responded_at,
-        response_note: row.response_note
+        response_note: row.response_note,
+        request_submitted_at: row.submitted_at,
+        request_fulfilled_at: row.fulfilled_at,
+        linked_article_id: row.linked_article_id || null
+      }));
+      const articleByRequestId = await getWriterRequestArticles(
+        db,
+        user.id,
+        requests.map((request) => request.id).filter(Boolean)
+      );
+      requests = requests.map((request) => ({
+        ...request,
+        linked_article: articleByRequestId.get(request.id) || null
       }));
       if (projectId) requests = requests.filter((request) => request.project_id === projectId);
       return res.json({ requests });

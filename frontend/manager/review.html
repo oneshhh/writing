@@ -40,6 +40,7 @@
               <div class="badge" id="status"></div>
               <h1 id="title"></h1>
               <div class="muted review-short" id="short"></div>
+              <div class="muted review-short hidden" id="requestMeta"></div>
             </div>
             <div class="review-score-row">
               <span class="pill">AI: <span id="aiScore"></span></span>
@@ -149,6 +150,7 @@
               (a) => `<article class="review-queue-item">
                 <div class="review-queue-title">${APP.escapeHtml(a.title || "Untitled")}</div>
                 <div class="muted review-queue-summary">${APP.escapeHtml(a.short_description || "")}</div>
+                ${a.request_id ? `<div class="muted review-queue-summary">Request submission${a.request_title ? ` - ${APP.escapeHtml(a.request_title)}` : ""}</div>` : ""}
                 <div class="review-queue-meta">
                   <span class="pill">AI: ${APP.checkBadge(a.ai_score)}</span>
                   <span class="pill">Plagiarism: ${APP.checkBadge(a.plagiarism_score)}</span>
@@ -182,6 +184,10 @@
           document.getElementById("status").innerHTML = APP.badgeForStatus(a.status);
           document.getElementById("title").textContent = a.title || "";
           document.getElementById("short").textContent = a.short_description || "";
+          document.getElementById("requestMeta").textContent = a.request_id
+            ? `Submitted for request${a.request_title ? `: ${a.request_title}` : ""}`
+            : "";
+          document.getElementById("requestMeta").classList.toggle("hidden", !a.request_id);
           document.getElementById("long").innerHTML = a.long_description || "";
           document.getElementById("note").value = "";
           document.getElementById("aiScore").innerHTML = APP.checkBadge(a.ai_score);

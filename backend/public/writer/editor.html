@@ -29,6 +29,7 @@
             <h2 style="margin:0">Article</h2>
             <a href="/writer/dashboard.html"><button class="secondary" type="button">Back</button></a>
           </div>
+          <div class="muted hidden" id="requestMeta" style="margin-top:8px"></div>
           <div class="two">
             <div>
               <label class="muted">Title</label>
@@ -486,6 +487,10 @@
         `;
         document.getElementById("remark").textContent =
           article.manager_note ? `Remark from manager: ${article.manager_note}` : "";
+        document.getElementById("requestMeta").textContent = article.request_id
+          ? `Request article${article.request_title ? `: ${article.request_title}` : ""}`
+          : "";
+        document.getElementById("requestMeta").classList.toggle("hidden", !article.request_id);
 
         renderShortCount();
         renderLongCount();

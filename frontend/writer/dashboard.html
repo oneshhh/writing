@@ -95,6 +95,8 @@
         let offset = 0;
         let total = null;
         let projectName = new Map();
+        let requestById = new Map();
+        let currentArticles = [];
         const requestedArticleId = new URLSearchParams(window.location.search).get("article");
         const requestedRequestId = new URLSearchParams(window.location.search).get("request");
 
@@ -117,12 +119,17 @@
         }
 
         function renderRows(rows) {
-          document.getElementById("rows").innerHTML = (rows || [])
+          currentArticles = rows || [];
+          document.getElementById("rows").innerHTML = currentArticles
             .map((a) => {
               const canEdit = a.status === "draft" || a.status === "rework";
+              const requestTitle = requestById.get(a.request_id)?.title || a.request_title || "";
               return `
                 <tr data-article-row="${a.id}">
-                  <td data-label="Title">${APP.escapeHtml(a.title)}</td>
+                  <td data-label="Title">
+                    <strong>${APP.escapeHtml(a.title)}</strong>
+                    ${a.request_id ? `<div class="muted">Request article${requestTitle ? ` - ${APP.escapeHtml(requestTitle)}` : ""}</div>` : ""}
+                  </td>
                   <td class="muted" data-label="Project">${APP.escapeHtml(projectName.get(a.project_id) || a.project_id)}</td>
                   <td data-label="Status">${APP.badgeForStatus(a.status)}</td>
                   <td data-label="AI">${APP.checkBadge(a.ai_score)}</td>
@@ -150,25 +157,32 @@
           APP.ui.tableSkeleton("requestRows", { rows: 4, cols: 5 });
           const out = await APP.apiFetch("/api/requests");
           const requests = out.requests || [];
+          requestById = new Map(requests.map((request) => [request.id, request]));
           document.getElementById("requestRows").innerHTML = requests.length
             ? requests
-                .map(
-                  (r) => `<tr data-request-row="${r.id}">
+                .map((r) => {
+                  const linked = r.linked_article || null;
+                  const linkedEditable = linked && (linked.status === "draft" || linked.status === "rework");
+                  const statusText = linked?.status || r.recipient_status || r.status || "open";
+                  const actionHtml =
+                    r.recipient_status === "pending"
+                      ? `<button class="secondary" data-accept-request="${r.id}">Accept</button><button class="danger" data-reject-request="${r.id}">Reject</button>`
+                      : linked?.id
+                        ? `<a href="/writer/editor.html?id=${encodeURIComponent(linked.id)}"><button class="secondary" type="button">${linkedEditable ? "Continue article" : "View article"}</button></a>`
+                        : r.recipient_status === "accepted"
+                          ? `<a href="/writer/submit.html?request=${encodeURIComponent(r.id)}"><button class="secondary" type="button">Start article</button></a>`
+                          : "";
+                  return `<tr data-request-row="${r.id}">
                     <td data-label="Request"><strong>${APP.escapeHtml(r.title || "")}</strong><div class="muted">${APP.escapeHtml((r.brief || "").slice(0, 120))}</div></td>
                     <td class="muted" data-label="Due">${r.due_at ? APP.escapeHtml(new Date(r.due_at).toLocaleString()) : "-"}</td>
                     <td data-label="Extra pay">${r.additional_payment ? `&#8377;${APP.escapeHtml(r.additional_payment)}` : "-"}</td>
-                    <td data-label="Status">${APP.badgeForStatus(r.recipient_status || r.status || "open")}</td>
-                    <td class="right" data-label="Action">
-                      ${
-                        r.recipient_status === "pending"
-                          ? `<button class="secondary" data-accept-request="${r.id}">Accept</button><button class="danger" data-reject-request="${r.id}">Reject</button>`
-                          : ""
-                      }
-                    </td>
-                  </tr>`
-                )
+                    <td data-label="Status">${APP.badgeForStatus(statusText)}</td>
+                    <td class="right" data-label="Action">${actionHtml}</td>
+                  </tr>`;
+                })
                 .join("")
             : "<tr><td colspan='5' class='muted'>No writing requests yet.</td></tr>";
+          if (currentArticles.length) renderRows(currentArticles);
           focusRequestedRequest();
 
           for (const b of document.querySelectorAll("button[data-accept-request],button[data-reject-request]")) {

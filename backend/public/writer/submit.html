@@ -17,6 +17,7 @@
       <div class="grid">
         <div class="card" style="grid-column: span 7">
           <h2>Create Article</h2>
+          <div class="muted hidden" id="requestMeta" style="margin-top:8px"></div>
           <div class="two">
             <div>
               <label class="muted">Project</label>
@@ -61,17 +62,44 @@
         if (!user) return;
         await renderTopbar({ role: user.role, links: [{ href: "/writer/dashboard.html", label: "Dashboard" }] });
 
+        const params = new URLSearchParams(window.location.search);
+        const requestedRequestId = params.get("request");
+        let requestContext = null;
+
         const projects = await APP.apiFetch("/api/projects");
         document.getElementById("project").innerHTML = (projects.projects || [])
           .map((p) => `<option value="${p.id}">${APP.escapeHtml(p.title)}</option>`)
           .join("");
 
         const msg = (t) => (document.getElementById("msg").textContent = t || "");
+        if (requestedRequestId) {
+          const requestOut = await APP.apiFetch("/api/requests");
+          requestContext = (requestOut.requests || []).find((request) => request.id === requestedRequestId) || null;
+          if (!requestContext) {
+            msg("That request is no longer available.");
+            return;
+          }
+          if (requestContext.linked_article?.id) {
+            window.location.href = `/writer/editor.html?id=${encodeURIComponent(requestContext.linked_article.id)}`;
+            return;
+          }
+          if (requestContext.recipient_status !== "accepted") {
+            msg("Accept the request before creating an article for it.");
+            return;
+          }
+          document.getElementById("project").value = requestContext.project_id;
+          document.getElementById("project").disabled = true;
+          document.getElementById("title").value = requestContext.title || "";
+          document.getElementById("short").value = requestContext.brief || "";
+          document.getElementById("requestMeta").textContent = `This article is being created for request: ${requestContext.title || "Writing request"}`;
+          document.getElementById("requestMeta").classList.remove("hidden");
+        }
         document.getElementById("create").onclick = async () => {
           msg("");
           try {
             const body = {
               project_id: document.getElementById("project").value,
+              request_id: requestContext?.id || null,
               article_type: document.getElementById("type").value,
               title: document.getElementById("title").value.trim(),
               short_description: document.getElementById("short").value

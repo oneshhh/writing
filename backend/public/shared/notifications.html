@@ -51,6 +51,9 @@
               ? `/manager/project-detail.html?id=${encodeURIComponent(projectId)}&request=${encodeURIComponent(requestId)}`
               : null;
           }
+          if (n?.type === "project_request_submission" && articleId) {
+            return user.role === "manager" ? `/manager/review.html?id=${encodeURIComponent(articleId)}` : null;
+          }
           return null;
         }
 

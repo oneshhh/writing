@@ -5,6 +5,7 @@ const { buildArticleUniqueId } = require("../utils/uniqueId");
 const { runAiCheck } = require("../services/aiCheck");
 const { runPlagiarismCheck } = require("../services/plagiarismCheck");
 const { notifyWriter } = require("../services/writerNotifications");
+const { createNotification } = require("../services/notifications");
 const { getManagerProjectIds, requireManagerProjectAccess } = require("../utils/projectAccess");
 
 const router = express.Router();
@@ -52,6 +53,96 @@ async function ensureProjectAccess(db, projectId, user) {
     await requireManagerProjectAccess(db, projectId, user.id);
   }
   return project;
+}
+
+function requestAccessError(message, status = 400) {
+  const error = new Error(message);
+  error.status = status;
+  return error;
+}
+
+async function getRequestArticleContext(db, requestId, writerId, projectId) {
+  const { data: recipient, error } = await db
+    .from("project_request_recipients")
+    .select("id,status,submitted_at,fulfilled_at,project_requests(id,project_id,title,status,send_scope,created_by,accepted_by)")
+    .eq("request_id", requestId)
+    .eq("writer_id", writerId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!recipient?.project_requests) throw requestAccessError("Request not found.", 404);
+  if (recipient.project_requests.project_id !== projectId) throw requestAccessError("Request does not belong to this project.");
+  if (recipient.status !== "accepted") throw requestAccessError("Accept the request first.");
+
+  const { data: article, error: articleErr } = await db
+    .from("articles")
+    .select("id,status,title,updated_at")
+    .eq("writer_id", writerId)
+    .eq("request_id", requestId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (articleErr) throw new Error(articleErr.message);
+
+  return { recipient, request: recipient.project_requests, article };
+}
+
+async function getProjectManagerIds(db, projectId, createdBy) {
+  const ids = new Set(createdBy ? [createdBy] : []);
+  const { data, error } = await db
+    .from("project_managers")
+    .select("manager_id")
+    .eq("project_id", projectId)
+    .eq("status", "active");
+  if (error && error.code !== "42P01") throw new Error(error.message);
+  for (const row of data || []) {
+    if (row.manager_id) ids.add(row.manager_id);
+  }
+  return Array.from(ids);
+}
+
+async function notifyRequestManagers(db, { article, request, actor }) {
+  const managerIds = await getProjectManagerIds(db, article.project_id, request.created_by);
+  if (!managerIds.length) return;
+  await Promise.all(
+    managerIds
+      .filter((userId) => userId && userId !== actor.id)
+      .map((userId) =>
+        createNotification({
+          user_id: userId,
+          type: "project_request_submission",
+          title: "Request submission received",
+          body: `${actor.full_name || "A writer"} submitted "${article.title}" for request "${request.title}".`,
+          payload: { article_id: article.id, request_id: request.id, project_id: article.project_id }
+        }).catch(() => null)
+      )
+  );
+}
+
+async function syncRequestArticleProgress(db, { request, writerId, articleId, articleStatus }) {
+  const now = new Date().toISOString();
+  const patch = { linked_article_id: articleId || null };
+  if (articleStatus === "submitted") patch.submitted_at = now;
+  if (articleStatus === "approved") patch.fulfilled_at = now;
+  const { error } = await db
+    .from("project_request_recipients")
+    .update(patch)
+    .eq("request_id", request.id)
+    .eq("writer_id", writerId);
+  if (error) throw new Error(error.message);
+
+  if (articleStatus !== "approved") return;
+  const { data: recipients, error: recipientsErr } = await db
+    .from("project_request_recipients")
+    .select("status,fulfilled_at")
+    .eq("request_id", request.id);
+  if (recipientsErr) throw new Error(recipientsErr.message);
+  const accepted = (recipients || []).filter((row) => row.status === "accepted");
+  const shouldClose = request.send_scope === "personal" || (accepted.length > 0 && accepted.every((row) => row.fulfilled_at));
+  if (!shouldClose) return;
+  await db
+    .from("project_requests")
+    .update({ status: "closed", closed_at: now, updated_at: now })
+    .eq("id", request.id);
 }
 
 router.get("/", async (req, res) => {
@@ -347,7 +438,7 @@ router.delete("/:id", authorizeRoles("admin"), async (req, res) => {
 });
 
 router.post("/", authorizeRoles("writer"), async (req, res) => {
-  const { project_id, title, short_description, long_description, article_type, seo_tags } = req.body || {};
+  const { project_id, request_id, title, short_description, long_description, article_type, seo_tags } = req.body || {};
   if (!project_id) return res.status(400).json({ error: "project_id is required" });
   if (!title) return res.status(400).json({ error: "title is required" });
 
@@ -362,9 +453,26 @@ router.post("/", authorizeRoles("writer"), async (req, res) => {
   if (aErr) return res.status(400).json({ error: aErr.message });
   if (!assignment) return res.status(403).json({ error: "Writer not assigned to project" });
 
+  let requestContext = null;
+  if (request_id) {
+    try {
+      requestContext = await getRequestArticleContext(db, String(request_id), req.auth.user.id, project_id);
+    } catch (e) {
+      return res.status(e.status || 400).json({ error: e.message || String(e) });
+    }
+    if (requestContext.request.status === "closed" && !requestContext.article) {
+      return res.status(400).json({ error: "This request is already closed." });
+    }
+    if (requestContext.article) {
+      return res.status(409).json({ error: "You already created an article for this request." });
+    }
+  }
+
   const articlePayload = {
     project_id,
     writer_id: req.auth.user.id,
+    request_id: requestContext?.request?.id || null,
+    request_title: requestContext?.request?.title || null,
     title,
     short_description: short_description || null,
     long_description: long_description || null,
@@ -443,6 +551,23 @@ router.post("/:id/submit", authorizeRoles("writer"), async (req, res) => {
     await db.from("articles").update(patchChecks).eq("id", id);
   }
 
+  if (updated.request_id) {
+    try {
+      const requestContext = await getRequestArticleContext(db, updated.request_id, updated.writer_id, updated.project_id);
+      await syncRequestArticleProgress(db, {
+        request: requestContext.request,
+        writerId: updated.writer_id,
+        articleId: updated.id,
+        articleStatus: "submitted"
+      });
+      await notifyRequestManagers(db, {
+        article: updated,
+        request: requestContext.request,
+        actor: req.auth.user
+      });
+    } catch (_e) {}
+  }
+
   return res.json({ article: { ...updated, ...patchChecks } });
 });
 
@@ -497,6 +622,18 @@ router.post("/:id/review", authorizeRoles("manager"), async (req, res) => {
         ],
         { onConflict: "article_id" }
       );
+  }
+
+  if (action === "approved" && updated.request_id) {
+    try {
+      const requestContext = await getRequestArticleContext(db, updated.request_id, updated.writer_id, updated.project_id);
+      await syncRequestArticleProgress(db, {
+        request: requestContext.request,
+        writerId: updated.writer_id,
+        articleId: updated.id,
+        articleStatus: "approved"
+      });
+    } catch (_e) {}
   }
 
   const { data: writer, error: writerErr } = await db
