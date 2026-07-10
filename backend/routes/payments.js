@@ -72,7 +72,8 @@ function summarizeMonthlyPayments(rows, monthKeys) {
 async function uploadProofFile(db, payment, file) {
   if (!file) return payment.proof_url || null;
   const bucket = "payment-proofs";
-  const path = `${payment.writer_id}/${payment.article_id}/${Date.now()}_${file.originalname}`;
+  const targetKey = payment.article_id || payment.request_id || payment.id;
+  const path = `${payment.writer_id}/${targetKey}/${Date.now()}_${file.originalname}`;
   const { error: upErr } = await db.storage.from(bucket).upload(path, file.buffer, {
     contentType: file.mimetype,
     upsert: true
@@ -88,6 +89,7 @@ async function verifyPaymentAccess(db, payment, user) {
 }
 
 async function markPaymentPaid({ db, payment, actor, paymentId, proofUrl }) {
+  const paymentTarget = payment.articles?.title || payment.request_title || (payment.article_id ? "your article" : "your accepted request");
   const patch = {
     status: "paid",
     payment_id: paymentId || null,
@@ -111,10 +113,15 @@ async function markPaymentPaid({ db, payment, actor, paymentId, proofUrl }) {
     email: writer?.email || null,
     type: "payment_received",
     title: "Payment approved",
-    body: `Your payment has been approved for ${payment.articles?.title || "your article"}.`,
-    payload: { payment_id: updated.id, article_id: updated.article_id, project_id: updated.project_id },
+    body: `Your payment has been approved for ${paymentTarget}.`,
+    payload: {
+      payment_id: updated.id,
+      article_id: updated.article_id,
+      request_id: updated.request_id || null,
+      project_id: updated.project_id
+    },
     emailSubject: "Real Write: payment approved",
-    emailText: `Your payment has been approved for ${payment.articles?.title || "your article"}.${updated.payment_id ? ` Payment ID: ${updated.payment_id}` : ""}`
+    emailText: `Your payment has been approved for ${paymentTarget}.${updated.payment_id ? ` Payment ID: ${updated.payment_id}` : ""}`
   });
 
   return updated;

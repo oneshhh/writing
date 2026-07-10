@@ -83,6 +83,27 @@
           return cursor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
         }
 
+        function eventTypeLabel(event) {
+          if (event?.type === "article_approved") return "Article approved";
+          if (event?.type === "request_due") return `${String(event.status || "open").replace(/_/g, " ")} request`;
+          if (event?.type === "note") return "Manager note";
+          return "Calendar event";
+        }
+
+        function renderTooltip(events) {
+          if (!events?.length) return "";
+          return `<div class="planner-tooltip" role="tooltip">
+            ${events
+              .map(
+                (event, index) => `<div class="planner-tooltip-item">
+                  <span class="planner-tooltip-type">${APP.escapeHtml(`${eventTypeLabel(event)} ${index + 1}`)}</span>
+                  <span class="planner-tooltip-text">${APP.escapeHtml(event.title || event.note || "Untitled event")}</span>
+                </div>`
+              )
+              .join("")}
+          </div>`;
+        }
+
         async function loadProjects() {
           const out = await APP.apiFetch("/api/projects");
           projectFilter.innerHTML = `<option value="">All projects</option>${(out.projects || [])
@@ -94,6 +115,7 @@
           const today = key(d) === key(new Date());
           const approved = Number(row.approved || 0);
           const due = Number(row.requests_due || 0);
+          const tooltip = renderTooltip(row.events || []);
           return `<div class="planner-day ${outside ? "is-outside" : ""} ${today ? "is-today" : ""}">
             <div class="planner-date-row">
               <span class="planner-date">${d.getDate()}</span>
@@ -108,6 +130,7 @@
                 .map((n) => `<span class="planner-note"><span class="material-symbols-outlined" aria-hidden="true">edit_note</span>${APP.escapeHtml(n.title)}</span>`)
                 .join("")}
             </div>
+            ${tooltip}
           </div>`;
         }
 

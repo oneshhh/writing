@@ -109,9 +109,9 @@
           document.getElementById("rows").innerHTML = (rows || [])
             .map((p) => {
               const a = p.articles;
-              const title = a?.title || "Article";
-              const uid = a?.unique_id || p.article_id;
-              const status = a?.status || "-";
+              const title = a?.title || p.request_title || (p.article_id ? "Article" : "Request bonus");
+              const uid = a?.unique_id || p.article_id || "Accepted writing request";
+              const status = a?.status || (p.article_id ? "-" : "request");
               return `<tr data-payment-row="${p.id}">
                 <td data-label="Article">
                   <div style="font-weight:750">${APP.escapeHtml(title)}</div>

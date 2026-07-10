@@ -176,21 +176,33 @@ async function renderTopbar({ role, links }) {
 
   const unreadBadge = document.getElementById("rwNotificationCount");
   if (role && unreadBadge) {
-    APP.apiFetch("/api/notifications", { skipLoader: true })
-      .then((data) => {
-        const unread = (data.notifications || []).filter((item) => !item.read).length;
-        if (unread > 0) {
-          unreadBadge.textContent = unread > 99 ? "99+" : String(unread);
-          unreadBadge.classList.remove("hidden");
-          unreadBadge.style.cssText =
-            "margin-left:auto;min-width:22px;height:22px;padding:0 7px;border-radius:999px;background:#c45a2b;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;";
-        } else {
+    let lastUnread = null;
+    let polling = false;
+    const pollNotifications = () => {
+      if (polling) return;
+      polling = true;
+      APP.apiFetch("/api/notifications", { skipLoader: true })
+        .then((data) => {
+          const unread = (data.notifications || []).filter((item) => !item.read).length;
+          updatePill(unreadBadge, unread, "#c45a2b");
+          if (lastUnread != null && unread > lastUnread && window.location.pathname !== "/shared/notifications.html") {
+            APP.ui?.toast?.(`${unread - lastUnread} new notification${unread - lastUnread === 1 ? "" : "s"}`, {
+              kind: "success",
+              ttlMs: 3200
+            });
+          }
+          lastUnread = unread;
+        })
+        .catch(() => {
           unreadBadge.classList.add("hidden");
-        }
-      })
-      .catch(() => {
-        unreadBadge.classList.add("hidden");
-      });
+        })
+        .finally(() => {
+          polling = false;
+        });
+    };
+    pollNotifications();
+    if (window.__rwNotificationBadgePoll) clearInterval(window.__rwNotificationBadgePoll);
+    window.__rwNotificationBadgePoll = setInterval(pollNotifications, 3000);
   }
 
   const updatePill = (pill, count, bg) => {

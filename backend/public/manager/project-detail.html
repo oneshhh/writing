@@ -259,6 +259,7 @@
 
         const params = new URLSearchParams(window.location.search);
         const id = params.get("id");
+        const requestedRequestId = params.get("request");
         if (!id) {
           window.location.href = "/manager/dashboard.html";
           return;
@@ -273,6 +274,15 @@
         let assignedWriters = [];
         let activeMonth = currentMonthKey();
         let availableMonths = [];
+
+        function focusRequestedRequest() {
+          if (!requestedRequestId) return;
+          const row = document.querySelector(`[data-request-row="${requestedRequestId}"]`);
+          if (!row) return;
+          row.style.outline = "2px solid rgba(196,90,43,0.45)";
+          row.style.outlineOffset = "-2px";
+          row.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
 
         function pad2(n) {
           return String(n).padStart(2, "0");
@@ -383,7 +393,7 @@
                   const accepted = recipients.filter((x) => x.status === "accepted").length;
                   const rejected = recipients.filter((x) => x.status === "rejected").length;
                   const pending = recipients.filter((x) => x.status === "pending").length;
-                  return `<tr>
+                  return `<tr data-request-row="${r.id}">
                     <td><strong>${APP.escapeHtml(r.title || "")}</strong><div class="muted">${APP.escapeHtml((r.brief || "").slice(0, 110))}</div></td>
                     <td class="muted">${r.due_at ? APP.escapeHtml(new Date(r.due_at).toLocaleString()) : "-"}</td>
                     <td><span class="pill">${APP.escapeHtml(r.send_scope || "group")}</span></td>
@@ -394,6 +404,7 @@
                 })
                 .join("")
             : "<tr><td colspan='6' class='muted'>No requests raised yet.</td></tr>";
+          focusRequestedRequest();
 
           for (const b of document.querySelectorAll("button[data-close-request]")) {
             b.onclick = async () => {

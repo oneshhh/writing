@@ -15,6 +15,30 @@ function parseLinks(value) {
     .slice(0, 12);
 }
 
+async function createAcceptedRequestPayment(db, request, writerId) {
+  const amount = Number(request?.additional_payment || 0);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+
+  const { data, error } = await db
+    .from("payments")
+    .insert([
+      {
+        writer_id: writerId,
+        project_id: request.project_id,
+        article_id: null,
+        request_id: request.id,
+        request_title: request.title || null,
+        payment_reason: "request_bonus",
+        amount,
+        status: "pending"
+      }
+    ])
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 async function getProjectWriterIds(db, projectId) {
   const { data, error } = await db.from("project_writers").select("writer_id").eq("project_id", projectId);
   if (error) throw new Error(error.message);
@@ -155,8 +179,8 @@ router.post("/", authorizeRoles("manager"), async (req, res) => {
           user_id: writerId,
           type: "project_request",
           title: "New writing request",
-          body: request.title,
-          payload: { request_id: request.id, project_id }
+          body: `${request.title}${amount && amount > 0 ? ` - Extra pay Rs ${amount}` : ""}`,
+          payload: { request_id: request.id, project_id, send_scope: scope }
         }).catch(() => null)
       )
     );
@@ -207,15 +231,25 @@ router.post("/:id/respond", authorizeRoles("writer"), async (req, res) => {
       .single();
     if (requestErr) throw new Error(requestErr.message);
 
+    let payment = null;
+    if (action === "accepted") {
+      payment = await createAcceptedRequestPayment(db, request, req.auth.user.id);
+    }
+
     await createNotification({
       user_id: request.created_by,
       type: "project_request_response",
       title: `Request ${action}`,
       body: `${req.auth.user.full_name || "A writer"} ${action} "${request.title}".`,
-      payload: { request_id: id, project_id: request.project_id, writer_id: req.auth.user.id }
+      payload: {
+        request_id: id,
+        project_id: request.project_id,
+        writer_id: req.auth.user.id,
+        payment_id: payment?.id || null
+      }
     }).catch(() => null);
 
-    return res.json({ recipient, request: updatedRequest });
+    return res.json({ recipient, request: updatedRequest, payment });
   } catch (e) {
     return res.status(e.status || 400).json({ error: e.message || String(e) });
   }

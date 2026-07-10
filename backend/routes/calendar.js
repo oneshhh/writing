@@ -18,10 +18,21 @@ function dateWindow(req) {
   return { start, end: endDate.toISOString().slice(0, 10), days };
 }
 
+function baseBucket(day) {
+  return { date: day, submitted: 0, approved: 0, requests_due: 0, notes: [], events: [] };
+}
+
 function addCount(map, day, key) {
   if (!day) return;
-  const row = map.get(day) || { date: day, submitted: 0, approved: 0, requests_due: 0, notes: [] };
+  const row = map.get(day) || baseBucket(day);
   row[key] = Number(row[key] || 0) + 1;
+  map.set(day, row);
+}
+
+function addEvent(map, day, event) {
+  if (!day || !event) return;
+  const row = map.get(day) || baseBucket(day);
+  row.events.push(event);
   map.set(day, row);
 }
 
@@ -37,24 +48,45 @@ router.get("/", authorizeRoles("writer", "manager", "admin"), async (req, res) =
       const { data: articles, error } = await db
         .from("articles")
         .select("id,status,submitted_at,reviewed_at,title")
-        .eq("writer_id", user.id)
-        .gte("created_at", `${start}T00:00:00.000Z`)
-        .lt("created_at", `${end}T00:00:00.000Z`);
+        .eq("writer_id", user.id);
       if (error) return res.status(400).json({ error: error.message });
 
       for (const article of articles || []) {
-        addCount(buckets, dateOnly(article.submitted_at), "submitted");
-        if (article.status === "approved") addCount(buckets, dateOnly(article.reviewed_at), "approved");
+        const submittedDay = dateOnly(article.submitted_at);
+        if (submittedDay >= start && submittedDay < end) {
+          addCount(buckets, submittedDay, "submitted");
+          addEvent(buckets, submittedDay, {
+            type: "article_submitted",
+            title: article.title || "Untitled article",
+            status: article.status || "submitted"
+          });
+        }
+        const reviewedDay = dateOnly(article.reviewed_at);
+        if (article.status === "approved" && reviewedDay >= start && reviewedDay < end) {
+          addCount(buckets, reviewedDay, "approved");
+          addEvent(buckets, reviewedDay, {
+            type: "article_approved",
+            title: article.title || "Untitled article",
+            status: "approved"
+          });
+        }
       }
 
       const { data: requests, error: requestErr } = await db
         .from("project_request_recipients")
-        .select("project_requests(id,title,due_at,status)")
+        .select("status,project_requests(id,title,due_at,status)")
         .eq("writer_id", user.id);
       if (requestErr) return res.status(400).json({ error: requestErr.message });
       for (const row of requests || []) {
         const due = dateOnly(row.project_requests?.due_at);
-        if (due >= start && due < end) addCount(buckets, due, "requests_due");
+        if (due >= start && due < end) {
+          addCount(buckets, due, "requests_due");
+          addEvent(buckets, due, {
+            type: "request_due",
+            title: row.project_requests?.title || "Writing request",
+            status: row.status || row.project_requests?.status || "pending"
+          });
+        }
       }
     } else {
       let projectIds = [];
@@ -73,7 +105,15 @@ router.get("/", authorizeRoles("writer", "manager", "admin"), async (req, res) =
       const { data: articles, error } = await q;
       if (error) return res.status(400).json({ error: error.message });
       for (const article of articles || []) {
-        if (article.status === "approved") addCount(buckets, dateOnly(article.reviewed_at), "approved");
+        const reviewedDay = dateOnly(article.reviewed_at);
+        if (article.status === "approved" && reviewedDay >= start && reviewedDay < end) {
+          addCount(buckets, reviewedDay, "approved");
+          addEvent(buckets, reviewedDay, {
+            type: "article_approved",
+            title: article.title || "Untitled article",
+            status: "approved"
+          });
+        }
       }
 
       let rq = db.from("project_requests").select("id,title,due_at,project_id,status").not("due_at", "is", null);
@@ -82,7 +122,14 @@ router.get("/", authorizeRoles("writer", "manager", "admin"), async (req, res) =
       if (requestErr) return res.status(400).json({ error: requestErr.message });
       for (const request of requests || []) {
         const due = dateOnly(request.due_at);
-        if (due >= start && due < end) addCount(buckets, due, "requests_due");
+        if (due >= start && due < end) {
+          addCount(buckets, due, "requests_due");
+          addEvent(buckets, due, {
+            type: "request_due",
+            title: request.title || "Writing request",
+            status: request.status || "open"
+          });
+        }
       }
     }
 
@@ -96,8 +143,14 @@ router.get("/", authorizeRoles("writer", "manager", "admin"), async (req, res) =
     if (notesErr) return res.status(400).json({ error: notesErr.message });
     for (const note of notes || []) {
       const day = dateOnly(note.event_date);
-      const row = buckets.get(day) || { date: day, submitted: 0, approved: 0, requests_due: 0, notes: [] };
+      const row = buckets.get(day) || baseBucket(day);
       row.notes.push(note);
+      row.events.push({
+        type: "note",
+        title: note.title || "Calendar note",
+        status: user.role === "manager" ? "manager note" : "personal note",
+        note: note.note || ""
+      });
       buckets.set(day, row);
     }
 

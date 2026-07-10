@@ -29,15 +29,27 @@
         const user = await APP.requireAuth();
         if (!user) return;
         await renderTopbar({ role: user.role, links: [{ href: `/${user.role}/dashboard.html`, label: "Dashboard" }] });
+        let lastSignature = "";
+        let lastUnread = null;
 
         function notificationHref(n) {
           const articleId = n?.payload?.article_id;
           const paymentId = n?.payload?.payment_id;
+          const requestId = n?.payload?.request_id;
+          const projectId = n?.payload?.project_id;
           if (String(n?.type || "").startsWith("payment")) {
             return user.role === "writer" ? `/writer/earnings.html?payment=${encodeURIComponent(paymentId || "")}` : null;
           }
           if (String(n?.type || "").startsWith("article_") && articleId) {
             return user.role === "writer" ? `/writer/dashboard.html?article=${encodeURIComponent(articleId)}` : null;
+          }
+          if (n?.type === "project_request" && requestId) {
+            return user.role === "writer" ? `/writer/dashboard.html?request=${encodeURIComponent(requestId)}` : null;
+          }
+          if (n?.type === "project_request_response" && requestId && projectId) {
+            return user.role === "manager"
+              ? `/manager/project-detail.html?id=${encodeURIComponent(projectId)}&request=${encodeURIComponent(requestId)}`
+              : null;
           }
           return null;
         }
@@ -46,10 +58,8 @@
           await APP.apiFetch(`/api/notifications/${encodeURIComponent(id)}/read`, { method: "PATCH" });
         }
 
-        async function refresh() {
-          APP.ui.tableSkeleton("rows", { rows: 10, cols: 5 });
-          const data = await APP.apiFetch("/api/notifications");
-          document.getElementById("rows").innerHTML = (data.notifications || [])
+        function renderRows(notifications) {
+          document.getElementById("rows").innerHTML = (notifications || [])
             .map((n) => {
               const href = notificationHref(n);
               return `<tr>
@@ -78,7 +88,30 @@
             };
           }
         }
+
+        async function refresh(silent) {
+          if (!silent) APP.ui.tableSkeleton("rows", { rows: 10, cols: 5 });
+          const data = await APP.apiFetch("/api/notifications");
+          const notifications = data.notifications || [];
+          const signature = notifications.map((n) => `${n.id}:${n.read ? 1 : 0}`).join("|");
+          const unread = notifications.filter((n) => !n.read).length;
+          if (signature !== lastSignature) {
+            renderRows(notifications);
+          }
+          if (silent && lastUnread != null && unread > lastUnread) {
+            APP.ui?.toast?.(`${unread - lastUnread} new notification${unread - lastUnread === 1 ? "" : "s"}`, {
+              kind: "success",
+              ttlMs: 3200
+            });
+          }
+          lastSignature = signature;
+          lastUnread = unread;
+        }
         await refresh();
+        if (window.__rwNotificationsPagePoll) clearInterval(window.__rwNotificationsPagePoll);
+        window.__rwNotificationsPagePoll = setInterval(() => {
+          refresh(true).catch(() => {});
+        }, 3000);
       })();
     </script>
   </body>

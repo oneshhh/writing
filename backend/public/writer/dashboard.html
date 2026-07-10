@@ -96,10 +96,20 @@
         let total = null;
         let projectName = new Map();
         const requestedArticleId = new URLSearchParams(window.location.search).get("article");
+        const requestedRequestId = new URLSearchParams(window.location.search).get("request");
 
         function focusRequestedArticle() {
           if (!requestedArticleId) return;
           const row = document.querySelector(`[data-article-row="${requestedArticleId}"]`);
+          if (!row) return;
+          row.style.outline = "2px solid rgba(196,90,43,0.45)";
+          row.style.outlineOffset = "-2px";
+          row.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+
+        function focusRequestedRequest() {
+          if (!requestedRequestId) return;
+          const row = document.querySelector(`[data-request-row="${requestedRequestId}"]`);
           if (!row) return;
           row.style.outline = "2px solid rgba(196,90,43,0.45)";
           row.style.outlineOffset = "-2px";
@@ -143,7 +153,7 @@
           document.getElementById("requestRows").innerHTML = requests.length
             ? requests
                 .map(
-                  (r) => `<tr>
+                  (r) => `<tr data-request-row="${r.id}">
                     <td data-label="Request"><strong>${APP.escapeHtml(r.title || "")}</strong><div class="muted">${APP.escapeHtml((r.brief || "").slice(0, 120))}</div></td>
                     <td class="muted" data-label="Due">${r.due_at ? APP.escapeHtml(new Date(r.due_at).toLocaleString()) : "-"}</td>
                     <td data-label="Extra pay">${r.additional_payment ? `&#8377;${APP.escapeHtml(r.additional_payment)}` : "-"}</td>
@@ -159,6 +169,7 @@
                 )
                 .join("")
             : "<tr><td colspan='5' class='muted'>No writing requests yet.</td></tr>";
+          focusRequestedRequest();
 
           for (const b of document.querySelectorAll("button[data-accept-request],button[data-reject-request]")) {
             b.onclick = async () => {

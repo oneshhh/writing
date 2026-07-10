@@ -1545,6 +1545,7 @@ button.danger {
   color: var(--rw-text);
   box-shadow: none;
   text-align: left;
+  overflow: visible;
   transition: background-color 0.18s ease, transform 0.18s ease;
 }
 
@@ -1643,6 +1644,57 @@ button.planner-day {
 
 .planner-note .material-symbols-outlined {
   font-size: 14px;
+}
+
+.planner-tooltip {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: calc(100% + 10px);
+  z-index: 8;
+  display: none;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(193, 200, 195, 0.92);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.12);
+}
+
+.planner-tooltip::after {
+  content: "";
+  position: absolute;
+  left: 18px;
+  top: 100%;
+  border-width: 8px 7px 0 7px;
+  border-style: solid;
+  border-color: rgba(255, 255, 255, 0.98) transparent transparent transparent;
+}
+
+.planner-day:hover .planner-tooltip,
+.planner-day:focus-within .planner-tooltip,
+.planner-day:focus-visible .planner-tooltip {
+  display: grid;
+}
+
+.planner-tooltip-item {
+  display: grid;
+  gap: 3px;
+}
+
+.planner-tooltip-type {
+  color: var(--rw-muted);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.planner-tooltip-text {
+  color: var(--rw-text);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
 }
 
 .calendar-select {

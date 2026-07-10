@@ -319,13 +319,20 @@
               const article = p.articles;
               const writer = p.writer;
               const checked = selection.has(p.id) ? "checked" : "";
+              const articleLabel = article?.title || p.request_title || (p.article_id ? "Article" : "Request bonus");
+              const articleMeta = article?.unique_id || p.article_id || "Accepted writing request";
+              const articleStatus = article?.status || (p.article_id ? "-" : "request");
               return `<tr>
                 <td class="right">
                   ${p.status === "pending" ? `<input type="checkbox" data-select="${p.id}" ${checked} aria-label="Select payment" />` : ""}
                 </td>
                 <td>
-                  <a href="/manager/review.html?id=${encodeURIComponent(p.article_id)}" style="font-weight:800;color:var(--rw-text);text-decoration:none;">${APP.escapeHtml(article?.title || "Article")}</a>
-                  <div class="muted">${APP.escapeHtml(article?.unique_id || p.article_id)} • ${APP.escapeHtml(article?.status || "-")}</div>
+                  ${
+                    p.article_id
+                      ? `<a href="/manager/review.html?id=${encodeURIComponent(p.article_id)}" style="font-weight:800;color:var(--rw-text);text-decoration:none;">${APP.escapeHtml(articleLabel)}</a>`
+                      : `<div style="font-weight:800">${APP.escapeHtml(articleLabel)}</div>`
+                  }
+                  <div class="muted">${APP.escapeHtml(articleMeta)} • ${APP.escapeHtml(articleStatus)}</div>
                 </td>
                 <td>
                   <div style="font-weight:750">${APP.escapeHtml(writer?.full_name || "Writer")}</div>

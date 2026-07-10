@@ -1,4 +1,4 @@
-/* global APP, RW_MESSAGES_ROLE */
+/* global APP, RW_MESSAGES_ROLE, supabase */
 
 (async function () {
   const role = window.RW_MESSAGES_ROLE;
@@ -19,36 +19,26 @@
         ];
   await renderTopbar({ role, links });
 
-  const enc = new TextEncoder();
-  const dec = new TextDecoder();
+  const defaultThreadTitle = "Select a chat";
+  const defaultThreadSubtitle = "Choose a conversation on the left to continue messaging.";
+  const defaultComposerHint = "Press Enter to send. Shift+Enter for a new line.";
   const state = {
     contacts: [],
     projects: [],
     active: null,
-    poll: null,
-    presencePoll: null,
-    privateKey: null,
-    publicKeyJwk: null
+    realtime: null,
+    realtimeChannel: null,
+    presenceBeat: null,
+    typingTimer: null,
+    typingClearTimer: null,
+    isTyping: false,
+    activeTyper: null
   };
-
-  const defaultThreadTitle = "Select a chat";
-  const defaultThreadSubtitle = "Choose a conversation on the left to continue messaging.";
 
   const $ = (id) => document.getElementById(id);
   const msg = (text) => {
-    $("msg").textContent = text || "";
+    $("msg").textContent = text || defaultComposerHint;
   };
-
-  function b64(bytes) {
-    const data = new Uint8Array(bytes);
-    let out = "";
-    for (let i = 0; i < data.length; i += 1) out += String.fromCharCode(data[i]);
-    return btoa(out);
-  }
-
-  function fromB64(value) {
-    return Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
-  }
 
   function initials(name) {
     return String(name || "U")
@@ -77,128 +67,212 @@
     return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
   }
 
-  function presenceLabel(lastActiveAt) {
-    if (!lastActiveAt) return "Not active yet";
-    const diff = Date.now() - new Date(lastActiveAt).getTime();
+  function contactById(id) {
+    return state.contacts.find((item) => item.id === id) || null;
+  }
+
+  function projectById(id) {
+    return state.projects.find((item) => item.id === id) || null;
+  }
+
+  function activeConversationKey() {
+    if (!state.active) return "";
+    if (state.active.kind === "project") return `project:${state.active.id}`;
+    return `direct:${[user.id, state.active.id].sort().join(":")}`;
+  }
+
+  function presenceLabel(contact) {
+    if (contact?.is_online) return "Active now";
+    if (!contact?.last_active_at) return "Offline";
+    const diff = Date.now() - new Date(contact.last_active_at).getTime();
     if (diff < 2 * 60 * 1000) return "Active now";
     if (diff < 60 * 60 * 1000) return `Last active ${Math.max(2, Math.round(diff / 60000))}m ago`;
     if (diff < 24 * 60 * 60 * 1000) return `Last active ${Math.round(diff / 3600000)}h ago`;
-    return `Last active ${new Date(lastActiveAt).toLocaleDateString()}`;
+    return `Last active ${new Date(contact.last_active_at).toLocaleDateString()}`;
   }
 
-  function presenceClass(lastActiveAt) {
-    if (!lastActiveAt) return "";
-    return Date.now() - new Date(lastActiveAt).getTime() < 2 * 60 * 1000 ? "online" : "";
+  function presenceClass(contact) {
+    if (contact?.is_online) return "online";
+    if (!contact?.last_active_at) return "";
+    return Date.now() - new Date(contact.last_active_at).getTime() < 2 * 60 * 1000 ? "online" : "";
   }
 
-  async function importPublicKey(jwk) {
-    return crypto.subtle.importKey("jwk", jwk, { name: "RSA-OAEP", hash: "SHA-256" }, true, ["encrypt"]);
+  function sortContacts(a, b) {
+    const unread = Number(b.unread_count || 0) - Number(a.unread_count || 0);
+    if (unread) return unread;
+    return new Date(b.last_message_at || b.last_active_at || 0) - new Date(a.last_message_at || a.last_active_at || 0);
   }
 
-  async function importPrivateKey(jwk) {
-    return crypto.subtle.importKey("jwk", jwk, { name: "RSA-OAEP", hash: "SHA-256" }, true, ["decrypt"]);
+  function sortProjects(a, b) {
+    const unread = Number(b.unread_count || 0) - Number(a.unread_count || 0);
+    if (unread) return unread;
+    return new Date(b.last_message_at || 0) - new Date(a.last_message_at || 0);
   }
 
-  async function ensureIdentity() {
-    const storageKey = `rw_e2ee_private_${user.id}`;
-    const localPrivate = localStorage.getItem(storageKey);
-    const existing = await APP.apiFetch("/api/messages/keys/me", { skipLoader: true }).catch(() => ({ key: null }));
+  function statusDot(status) {
+    const safe = ["delivered", "read", "failed"].includes(status) ? status : "delivered";
+    const label = safe === "read" ? "Read" : safe === "failed" ? "Failed" : "Delivered";
+    return `<span class="message-status ${safe}" title="${label}"><i></i>${label}</span>`;
+  }
 
-    if (localPrivate) {
-      state.privateKey = await importPrivateKey(JSON.parse(localPrivate));
-      if (existing.key) {
-        state.publicKeyJwk = existing.key.public_key_jwk;
-        return;
+  function isActiveRefresh(payload) {
+    if (!state.active || !payload) return false;
+    if (state.active.kind === "project") return payload.project_id === state.active.id;
+    const ids = Array.isArray(payload.direct_user_ids) ? payload.direct_user_ids : [];
+    return ids.includes(user.id) && ids.includes(state.active.id);
+  }
+
+  function applyPresenceState(presenceState) {
+    const online = new Map();
+    for (const slice of Object.values(presenceState || {})) {
+      for (const entry of slice || []) {
+        if (!entry?.user_id) continue;
+        const existing = online.get(entry.user_id);
+        const candidate = entry.online_at || null;
+        if (!existing || (candidate && candidate > existing)) online.set(entry.user_id, candidate);
       }
     }
-
-    const pair = await crypto.subtle.generateKey(
-      { name: "RSA-OAEP", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
-      true,
-      ["encrypt", "decrypt"]
-    );
-    const privateJwk = await crypto.subtle.exportKey("jwk", pair.privateKey);
-    const publicJwk = await crypto.subtle.exportKey("jwk", pair.publicKey);
-    localStorage.setItem(storageKey, JSON.stringify(privateJwk));
-    state.privateKey = pair.privateKey;
-    state.publicKeyJwk = publicJwk;
-    await APP.apiFetch("/api/messages/keys", { method: "POST", body: JSON.stringify({ public_key_jwk: publicJwk }), skipLoader: true });
+    state.contacts = state.contacts
+      .map((contact) => ({
+        ...contact,
+        is_online: online.has(contact.id),
+        last_active_at: online.get(contact.id) || contact.last_active_at
+      }))
+      .sort(sortContacts);
+    renderConversationList();
+    if (state.active) renderThreadHeader();
   }
 
-  async function heartbeat() {
-    await APP.apiFetch("/api/messages/presence", { method: "POST", body: JSON.stringify({}), skipLoader: true }).catch(() => {});
+  function handleTyping(payload) {
+    if (!payload || payload.user_id === user.id) return;
+    if (payload.conversation_key !== activeConversationKey()) return;
+    clearTimeout(state.typingClearTimer);
+    state.activeTyper = payload.is_typing ? { user_id: payload.user_id, full_name: payload.full_name || "Someone" } : null;
+    if (payload.is_typing) {
+      state.typingClearTimer = setTimeout(() => {
+        state.activeTyper = null;
+        renderThreadHeader();
+      }, 1800);
+    }
+    renderThreadHeader();
+  }
+
+  function activeDetails() {
+    if (!state.active) return null;
+    if (state.active.kind === "project") {
+      const project = projectById(state.active.id);
+      return {
+        title: state.active.title,
+        avatar: "#",
+        avatarClass: "room",
+        subtitle: state.activeTyper ? `${state.activeTyper.full_name} is typing...` : `Project room - ${project?.status || "active"}`
+      };
+    }
+    const contact = contactById(state.active.id);
+    const name = contact?.full_name || contact?.email || state.active.title;
+    return {
+      title: name,
+      avatar: initials(name),
+      avatarClass: presenceClass(contact),
+      subtitle: state.activeTyper ? `${state.activeTyper.full_name} is typing...` : `${contact?.role || "user"} - ${presenceLabel(contact)}`
+    };
+  }
+
+  function renderThreadHeader() {
+    if (!state.active) {
+      msg(defaultComposerHint);
+      return;
+    }
+    const active = activeDetails();
+    $("chatTitle").textContent = active.title;
+    $("chatSubtitle").textContent = active.subtitle;
+    const avatar = $("chatHeaderAvatar");
+    avatar.textContent = active.avatar;
+    avatar.className = `chat-avatar ${active.avatarClass || ""}`.trim();
+    msg(state.activeTyper ? active.subtitle : defaultComposerHint);
   }
 
   async function loadConversations() {
     const out = await APP.apiFetch("/api/messages/conversations", { skipLoader: true });
-    state.contacts = (out.contacts || []).sort((a, b) => {
-      const unread = Number(b.unread_count || 0) - Number(a.unread_count || 0);
-      if (unread) return unread;
-      return new Date(b.last_message_at || b.last_active_at || 0) - new Date(a.last_message_at || a.last_active_at || 0);
-    });
-    state.projects = out.projects || [];
+    state.contacts = (out.contacts || []).sort(sortContacts);
+    state.projects = (out.projects || []).sort(sortProjects);
     renderConversationList();
+    if (state.active) renderThreadHeader();
+  }
+
+  async function loadMessages() {
+    if (!state.active) {
+      renderEmptyThread();
+      return;
+    }
+    renderThreadHeader();
+    $("chatComposer").classList.remove("hidden");
+    const query =
+      state.active.kind === "project"
+        ? `project_id=${encodeURIComponent(state.active.id)}`
+        : `recipient_id=${encodeURIComponent(state.active.id)}`;
+    const out = await APP.apiFetch(`/api/messages?${query}`, { skipLoader: true });
+    const rows = [];
+    let lastDay = "";
+    for (const row of out.messages || []) {
+      const mine = row.sender_id === user.id;
+      const currentDay = dayLabel(row.created_at);
+      if (currentDay && currentDay !== lastDay) {
+        rows.push(`<div class="chat-date-divider"><span>${APP.escapeHtml(currentDay)}</span></div>`);
+        lastDay = currentDay;
+      }
+      rows.push(`<div class="chat-message-row ${mine ? "mine" : ""}">
+        ${mine ? "" : `<span class="chat-mini-avatar">${APP.escapeHtml(initials(row.sender?.full_name || "User"))}</span>`}
+        <div class="chat-bubble ${mine ? "mine" : ""}">
+          <span class="chat-sender">${APP.escapeHtml(row.sender?.full_name || (mine ? "You" : "User"))} - ${APP.escapeHtml(timeLabel(row.created_at))}</span>
+          <div>${APP.escapeHtml(row.body || "")}</div>
+          ${mine ? `<span class="chat-meta">${statusDot(row.delivery_status)}</span>` : ""}
+        </div>
+      </div>`);
+    }
+    const list = $("messageList");
+    list.innerHTML = rows.length ? rows.join("") : "<div class='chat-empty-state'>No messages yet. Start the conversation.</div>";
+    list.scrollTop = list.scrollHeight;
   }
 
   async function openConversation(kind, id, title) {
+    emitTyping(false);
+    state.activeTyper = null;
     state.active = { kind, id, title };
     renderConversationList();
     await loadMessages();
     await loadConversations();
-    if (state.poll) clearInterval(state.poll);
-    state.poll = setInterval(async () => {
-      await loadMessages();
-      await loadConversations();
-    }, 3500);
   }
 
   function contactItem(contact) {
     const active = state.active?.kind === "direct" && state.active?.id === contact.id;
     const name = contact.full_name || contact.email || "User";
     const unread = Number(contact.unread_count || 0);
-    return `<button class="chat-list-item ${active ? "active" : ""}" data-chat-kind="direct" data-chat-id="${contact.id}" ${contact.public_key ? "" : "disabled"} type="button">
-      <span class="chat-avatar ${presenceClass(contact.last_active_at)}">${APP.escapeHtml(initials(name))}</span>
+    return `<button class="chat-list-item ${active ? "active" : ""}" data-chat-kind="direct" data-chat-id="${contact.id}" type="button">
+      <span class="chat-avatar ${presenceClass(contact)}">${APP.escapeHtml(initials(name))}</span>
       <span class="chat-list-copy">
         <span class="chat-list-title">
           <strong>${APP.escapeHtml(name)}</strong>
           ${unread ? `<em>${unread > 99 ? "99+" : unread}</em>` : ""}
         </span>
-        <span>${APP.escapeHtml(contact.role || "user")} - ${APP.escapeHtml(presenceLabel(contact.last_active_at))}</span>
-        ${contact.public_key ? "" : "<span>Needs to open Messages once for encryption setup</span>"}
+        <span>${APP.escapeHtml(contact.role || "user")} - ${APP.escapeHtml(presenceLabel(contact))}</span>
       </span>
     </button>`;
   }
 
   function projectItem(project) {
     const active = state.active?.kind === "project" && state.active?.id === project.id;
+    const unread = Number(project.unread_count || 0);
     return `<button class="chat-list-item ${active ? "active" : ""}" data-chat-kind="project" data-chat-id="${project.id}" type="button">
       <span class="chat-avatar room">#</span>
       <span class="chat-list-copy">
-        <span class="chat-list-title"><strong>${APP.escapeHtml(project.title || "Project room")}</strong></span>
+        <span class="chat-list-title">
+          <strong>${APP.escapeHtml(project.title || "Project room")}</strong>
+          ${unread ? `<em>${unread > 99 ? "99+" : unread}</em>` : ""}
+        </span>
         <span>Project room - ${APP.escapeHtml(project.status || "active")}</span>
       </span>
     </button>`;
-  }
-
-  function activeDetails() {
-    if (!state.active) return null;
-    if (state.active.kind === "project") {
-      const project = state.projects.find((item) => item.id === state.active.id);
-      return {
-        title: state.active.title,
-        avatar: "#",
-        avatarClass: "room",
-        subtitle: `Project room - encrypted for members${project?.status ? ` - ${project.status}` : ""}`
-      };
-    }
-    const contact = state.contacts.find((item) => item.id === state.active.id);
-    const name = contact?.full_name || contact?.email || state.active.title;
-    return {
-      title: name,
-      avatar: initials(name),
-      avatarClass: presenceClass(contact?.last_active_at),
-      subtitle: `Direct chat - encrypted - ${presenceLabel(contact?.last_active_at)}`
-    };
   }
 
   function renderConversationList() {
@@ -245,97 +319,11 @@
         <p>Pick a project room or person from the left to open the conversation here.</p>
       </div>
     `;
-  }
-
-  async function recipientsForActive() {
-    if (!state.active) return [];
-    if (state.active.kind === "direct") {
-      const contact = state.contacts.find((item) => item.id === state.active.id);
-      return [contact, { id: user.id, public_key: { public_key_jwk: state.publicKeyJwk } }].filter(Boolean);
-    }
-    const out = await APP.apiFetch(`/api/messages/contacts?project_id=${encodeURIComponent(state.active.id)}`, { skipLoader: true });
-    return [...(out.users || []), { id: user.id, public_key: { public_key_jwk: state.publicKeyJwk } }];
-  }
-
-  async function encryptForRecipients(text, recipients) {
-    const aesKey = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const cipher = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, aesKey, enc.encode(text));
-    const rawKey = await crypto.subtle.exportKey("raw", aesKey);
-    const keys = [];
-
-    for (const recipient of recipients) {
-      const jwk = recipient?.public_key?.public_key_jwk;
-      if (!recipient?.id || !jwk) continue;
-      const publicKey = await importPublicKey(jwk);
-      const encryptedKey = await crypto.subtle.encrypt({ name: "RSA-OAEP" }, publicKey, rawKey);
-      keys.push({ user_id: recipient.id, encrypted_key: b64(encryptedKey) });
-    }
-
-    return { cipher_text: b64(cipher), iv: b64(iv), keys };
-  }
-
-  async function decryptMessage(row) {
-    if (!row.encrypted_key) return "[No encrypted key for this device]";
-    const rawKey = await crypto.subtle.decrypt({ name: "RSA-OAEP" }, state.privateKey, fromB64(row.encrypted_key));
-    const aesKey = await crypto.subtle.importKey("raw", rawKey, { name: "AES-GCM" }, false, ["decrypt"]);
-    const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromB64(row.iv) }, aesKey, fromB64(row.cipher_text));
-    return dec.decode(plain);
-  }
-
-  function statusDot(status) {
-    const safe = ["delivered", "read", "failed"].includes(status) ? status : "delivered";
-    const label = safe === "read" ? "Read" : safe === "failed" ? "Failed" : "Delivered";
-    return `<span class="message-status ${safe}" title="${label}"><i></i>${label}</span>`;
-  }
-
-  async function loadMessages() {
-    if (!state.active) {
-      renderEmptyThread();
-      return;
-    }
-    const active = activeDetails();
-    $("chatTitle").textContent = active.title;
-    $("chatSubtitle").textContent = active.subtitle;
-    const avatar = $("chatHeaderAvatar");
-    avatar.textContent = active.avatar;
-    avatar.className = `chat-avatar ${active.avatarClass || ""}`;
-    $("chatComposer").classList.remove("hidden");
-    const query =
-      state.active.kind === "project"
-        ? `project_id=${encodeURIComponent(state.active.id)}`
-        : `recipient_id=${encodeURIComponent(state.active.id)}`;
-    const out = await APP.apiFetch(`/api/messages?${query}`, { skipLoader: true });
-    const rows = [];
-    let lastDay = "";
-    for (const row of out.messages || []) {
-      let text = "[Could not decrypt on this device]";
-      try {
-        text = await decryptMessage(row);
-      } catch {}
-      const mine = row.sender_id === user.id;
-      const currentDay = dayLabel(row.created_at);
-      if (currentDay && currentDay !== lastDay) {
-        rows.push(`<div class="chat-date-divider"><span>${APP.escapeHtml(currentDay)}</span></div>`);
-        lastDay = currentDay;
-      }
-      rows.push(`<div class="chat-message-row ${mine ? "mine" : ""}">
-        ${mine ? "" : `<span class="chat-mini-avatar">${APP.escapeHtml(initials(row.sender?.full_name || "User"))}</span>`}
-        <div class="chat-bubble ${mine ? "mine" : ""}">
-          <span class="chat-sender">${APP.escapeHtml(row.sender?.full_name || (mine ? "You" : "User"))} - ${APP.escapeHtml(timeLabel(row.created_at))}</span>
-          <div>${APP.escapeHtml(text)}</div>
-          ${mine ? `<span class="chat-meta">${statusDot(row.delivery_status)}</span>` : ""}
-        </div>
-      </div>`);
-    }
-    const list = $("messageList");
-    const lockNotice = `<div class="chat-lock-note"><span class="material-symbols-outlined" aria-hidden="true">lock</span><span>Messages are encrypted with public/private keys.</span></div>`;
-    list.innerHTML = rows.length ? `${rows.join("")}${lockNotice}` : "<div class='chat-empty-state'>No messages yet. Start the conversation.</div>";
-    list.scrollTop = list.scrollHeight;
+    msg(defaultComposerHint);
   }
 
   async function sendMessage() {
-    msg("");
+    msg(defaultComposerHint);
     if (!state.active) return msg("Choose a conversation first.");
     const input = $("messageText");
     const text = input.value.trim();
@@ -344,26 +332,19 @@
     const send = $("sendMessage");
     send.disabled = true;
     try {
-      const recipients = await recipientsForActive();
-      const payload = await encryptForRecipients(text, recipients);
-      if (!payload.keys.some((key) => key.user_id === user.id)) {
-        return msg("Your encryption key is not ready. Refresh this page once.");
-      }
-      if (state.active.kind === "direct" && payload.keys.length < 2) {
-        return msg("That user needs to open Messages once before they can receive encrypted messages.");
-      }
       await APP.apiFetch("/api/messages", {
         method: "POST",
         skipLoader: true,
         body: JSON.stringify({
-          ...payload,
-          algorithm: "AES-GCM/RSA-OAEP-256",
+          text,
           audience: state.active.kind === "project" ? "project" : "direct",
           project_id: state.active.kind === "project" ? state.active.id : null,
           recipient_id: state.active.kind === "direct" ? state.active.id : null
         })
       });
       input.value = "";
+      input.style.height = "auto";
+      emitTyping(false);
       await loadMessages();
       await loadConversations();
     } catch (e) {
@@ -371,6 +352,81 @@
     } finally {
       send.disabled = false;
     }
+  }
+
+  function emitTyping(isTyping) {
+    if (!state.realtimeChannel || !state.active) return;
+    if (!isTyping) {
+      clearTimeout(state.typingTimer);
+      state.typingTimer = null;
+    }
+    state.realtimeChannel.send({
+      type: "broadcast",
+      event: "typing",
+      payload: {
+        conversation_key: activeConversationKey(),
+        user_id: user.id,
+        full_name: user.full_name || user.email || "User",
+        is_typing: isTyping
+      }
+    });
+    state.isTyping = isTyping;
+  }
+
+  function scheduleTypingStop() {
+    clearTimeout(state.typingTimer);
+    state.typingTimer = setTimeout(() => {
+      if (state.isTyping) emitTyping(false);
+    }, 1200);
+  }
+
+  async function setupRealtime() {
+    if (!window.supabase?.createClient) return;
+    try {
+      const cfg = await APP.apiFetch("/api/messages/realtime-config", { skipLoader: true });
+      state.realtime = window.supabase.createClient(cfg.url, cfg.key);
+      const presenceKey = `${user.id}:${Math.random().toString(36).slice(2)}`;
+      const channel = state.realtime.channel(cfg.topic, {
+        config: {
+          presence: { key: presenceKey },
+          broadcast: { self: false }
+        }
+      });
+      channel
+        .on("presence", { event: "sync" }, () => {
+          applyPresenceState(channel.presenceState());
+        })
+        .on("broadcast", { event: "messages:refresh" }, async ({ payload }) => {
+          await loadConversations();
+          if (isActiveRefresh(payload)) await loadMessages();
+        })
+        .on("broadcast", { event: "typing" }, ({ payload }) => {
+          handleTyping(payload);
+        });
+      channel.subscribe(async (status) => {
+        if (status !== "SUBSCRIBED") return;
+        state.realtimeChannel = channel;
+        await channel.track({
+          user_id: user.id,
+          full_name: user.full_name || user.email || "User",
+          online_at: new Date().toISOString()
+        });
+      });
+      state.presenceBeat = setInterval(async () => {
+        await APP.apiFetch("/api/messages/presence", {
+          method: "POST",
+          skipLoader: true,
+          body: JSON.stringify({})
+        }).catch(() => {});
+        if (state.realtimeChannel) {
+          state.realtimeChannel.track({
+            user_id: user.id,
+            full_name: user.full_name || user.email || "User",
+            online_at: new Date().toISOString()
+          }).catch(() => {});
+        }
+      }, 30000);
+    } catch {}
   }
 
   $("chatSearch").addEventListener("input", renderConversationList);
@@ -384,6 +440,13 @@
     const input = $("messageText");
     input.style.height = "auto";
     input.style.height = `${Math.min(input.scrollHeight, 140)}px`;
+    if (!state.active) return;
+    if (!input.value.trim()) {
+      if (state.isTyping) emitTyping(false);
+      return;
+    }
+    if (!state.isTyping) emitTyping(true);
+    scheduleTypingStop();
   });
   $("messageText").addEventListener("keydown", (event) => {
     if (event.key === "Enter" && !event.shiftKey) {
@@ -391,10 +454,18 @@
       sendMessage();
     }
   });
+  window.addEventListener("beforeunload", () => {
+    if (state.isTyping) emitTyping(false);
+    if (state.presenceBeat) clearInterval(state.presenceBeat);
+    if (state.realtime && state.realtimeChannel) state.realtime.removeChannel(state.realtimeChannel);
+  });
 
-  await ensureIdentity();
-  await heartbeat();
-  state.presencePoll = setInterval(heartbeat, 30000);
+  await APP.apiFetch("/api/messages/presence", {
+    method: "POST",
+    skipLoader: true,
+    body: JSON.stringify({})
+  }).catch(() => {});
   await loadConversations();
   renderEmptyThread();
+  await setupRealtime();
 })();
