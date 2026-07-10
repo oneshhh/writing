@@ -64,7 +64,7 @@ function requestAccessError(message, status = 400) {
 async function getRequestArticleContext(db, requestId, writerId, projectId) {
   const { data: recipient, error } = await db
     .from("project_request_recipients")
-    .select("id,status,submitted_at,fulfilled_at,project_requests(id,project_id,title,status,send_scope,created_by,accepted_by)")
+    .select("id,status,submitted_at,fulfilled_at,project_requests(id,project_id,title,status,send_scope,created_by,accepted_by,additional_payment)")
     .eq("request_id", requestId)
     .eq("writer_id", writerId)
     .maybeSingle();
@@ -599,6 +599,13 @@ router.post("/:id/review", authorizeRoles("manager"), async (req, res) => {
     .single();
   if (error) return res.status(400).json({ error: error.message });
 
+  let requestContext = null;
+  if (updated.request_id) {
+    try {
+      requestContext = await getRequestArticleContext(db, updated.request_id, updated.writer_id, updated.project_id);
+    } catch (_e) {}
+  }
+
   // If approved, create a pending payment for this article (best-effort)
   if (action === "approved") {
     const { data: assignment } = await db
@@ -607,7 +614,11 @@ router.post("/:id/review", authorizeRoles("manager"), async (req, res) => {
       .eq("project_id", updated.project_id)
       .eq("writer_id", updated.writer_id)
       .maybeSingle();
-    const amount = assignment?.price_per_article ?? 0;
+    const baseAmount = Number(assignment?.price_per_article ?? 0);
+    const extraAmount = Number(requestContext?.request?.additional_payment ?? 0);
+    const amount =
+      (Number.isFinite(baseAmount) ? baseAmount : 0) +
+      (Number.isFinite(extraAmount) && extraAmount > 0 ? extraAmount : 0);
     await db
       .from("payments")
       .upsert(
@@ -616,17 +627,29 @@ router.post("/:id/review", authorizeRoles("manager"), async (req, res) => {
             writer_id: updated.writer_id,
             project_id: updated.project_id,
             article_id: updated.id,
+            request_id: updated.request_id || null,
+            request_title: requestContext?.request?.title || updated.request_title || null,
+            payment_reason: "article",
             amount,
             status: "pending"
           }
         ],
         { onConflict: "article_id" }
       );
+    if (updated.request_id) {
+      await db
+        .from("payments")
+        .delete()
+        .eq("writer_id", updated.writer_id)
+        .eq("request_id", updated.request_id)
+        .eq("payment_reason", "request_bonus")
+        .eq("status", "pending")
+        .is("article_id", null);
+    }
   }
 
-  if (action === "approved" && updated.request_id) {
+  if (action === "approved" && requestContext) {
     try {
-      const requestContext = await getRequestArticleContext(db, updated.request_id, updated.writer_id, updated.project_id);
       await syncRequestArticleProgress(db, {
         request: requestContext.request,
         writerId: updated.writer_id,
