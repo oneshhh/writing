@@ -15,6 +15,17 @@ router.get("/", async (req, res) => {
   return res.json({ notifications: data });
 });
 
+router.get("/unread-count", async (req, res) => {
+  const db = getSupabaseAdmin();
+  const { count, error } = await db
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", req.auth.user.id)
+    .eq("read", false);
+  if (error) return res.status(400).json({ error: error.message });
+  return res.json({ unread: Number(count || 0) });
+});
+
 router.patch("/:id/read", async (req, res) => {
   const { id } = req.params;
   const db = getSupabaseAdmin();
@@ -30,4 +41,3 @@ router.patch("/:id/read", async (req, res) => {
 });
 
 module.exports = router;
-

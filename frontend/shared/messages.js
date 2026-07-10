@@ -115,6 +115,28 @@
     return `<span class="message-status ${safe}" title="${label}"><i></i>${label}</span>`;
   }
 
+  function syncActiveConversationMeta(lastMessageAt) {
+    if (!state.active) return;
+    if (state.active.kind === "project") {
+      state.projects = state.projects
+        .map((project) =>
+          project.id === state.active.id
+            ? { ...project, unread_count: 0, last_message_at: lastMessageAt || project.last_message_at }
+            : project
+        )
+        .sort(sortProjects);
+    } else {
+      state.contacts = state.contacts
+        .map((contact) =>
+          contact.id === state.active.id
+            ? { ...contact, unread_count: 0, last_message_at: lastMessageAt || contact.last_message_at }
+            : contact
+        )
+        .sort(sortContacts);
+    }
+    renderConversationList();
+  }
+
   function isActiveRefresh(payload) {
     if (!state.active || !payload) return false;
     if (state.active.kind === "project") return payload.project_id === state.active.id;
@@ -233,6 +255,8 @@
     const list = $("messageList");
     list.innerHTML = rows.length ? rows.join("") : "<div class='chat-empty-state'>No messages yet. Start the conversation.</div>";
     list.scrollTop = list.scrollHeight;
+    const lastMessage = out.messages && out.messages.length ? out.messages[out.messages.length - 1] : null;
+    syncActiveConversationMeta(lastMessage?.created_at || null);
   }
 
   async function openConversation(kind, id, title) {
@@ -241,7 +265,6 @@
     state.active = { kind, id, title };
     renderConversationList();
     await loadMessages();
-    await loadConversations();
   }
 
   function contactItem(contact) {
@@ -346,7 +369,6 @@
       input.style.height = "auto";
       emitTyping(false);
       await loadMessages();
-      await loadConversations();
     } catch (e) {
       msg(e.message || String(e));
     } finally {

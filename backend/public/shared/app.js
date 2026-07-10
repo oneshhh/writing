@@ -2,6 +2,8 @@
 
 const DEFAULT_LOADER_DELAY_MS = 900;
 const ACTION_RESULT_VISIBLE_MS = 160;
+const AUTH_CACHE_KEY = "rwAuthUser";
+const AUTH_CACHE_TTL_MS = 30000;
 
 function getLoaderState() {
   if (!window.__rwLoaderState) {
@@ -127,6 +129,31 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function getCachedAuthUser() {
+  try {
+    const raw = sessionStorage.getItem(AUTH_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.user || Number(parsed.expiresAt || 0) <= Date.now()) {
+      sessionStorage.removeItem(AUTH_CACHE_KEY);
+      return null;
+    }
+    return parsed.user;
+  } catch {
+    return null;
+  }
+}
+
+function setCachedAuthUser(user) {
+  try {
+    if (!user) {
+      sessionStorage.removeItem(AUTH_CACHE_KEY);
+      return;
+    }
+    sessionStorage.setItem(AUTH_CACHE_KEY, JSON.stringify({ user, expiresAt: Date.now() + AUTH_CACHE_TTL_MS }));
+  } catch {}
+}
+
 async function runActionOverlay({ title, sub, successSymbol = "check_circle", errorSymbol = "error", action }) {
   beginLoading(title || "Working...", { sub: sub || "Please wait..." });
   try {
@@ -201,6 +228,7 @@ async function apiFetch(path, options) {
     if (res.status === 204) return {};
 
     const body = await res.json().catch(() => ({}));
+    if (res.status === 401) setCachedAuthUser(null);
     if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);
     return body;
   } finally {
@@ -209,10 +237,30 @@ async function apiFetch(path, options) {
 }
 
 async function requireAuth() {
+  const cachedUser = getCachedAuthUser();
+  if (cachedUser) return cachedUser;
+  if (window.__rwAuthUserPromise) {
+    try {
+      return await window.__rwAuthUserPromise;
+    } catch {
+      setCachedAuthUser(null);
+      window.location.href = "/login.html";
+      return null;
+    }
+  }
   try {
-    const me = await apiFetch("/api/auth/me", { skipLoader: true });
-    return me.user || null;
+    window.__rwAuthUserPromise = apiFetch("/api/auth/me", { skipLoader: true })
+      .then((me) => {
+        const user = me.user || null;
+        setCachedAuthUser(user);
+        return user;
+      })
+      .finally(() => {
+        window.__rwAuthUserPromise = null;
+      });
+    return await window.__rwAuthUserPromise;
   } catch {
+    setCachedAuthUser(null);
     window.location.href = "/login.html";
     return null;
   }
@@ -306,6 +354,7 @@ async function logout() {
   } catch {
     // ignore
   }
+  setCachedAuthUser(null);
   window.location.href = "/login.html";
 }
 

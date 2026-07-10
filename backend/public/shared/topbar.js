@@ -1,5 +1,7 @@
 /* global APP */
 
+const BADGE_POLL_MS = 15000;
+
 async function renderTopbar({ role, links }) {
   const bar = document.getElementById("topbar");
   if (!bar) return;
@@ -179,11 +181,11 @@ async function renderTopbar({ role, links }) {
     let lastUnread = null;
     let polling = false;
     const pollNotifications = () => {
-      if (polling) return;
+      if (polling || document.visibilityState === "hidden") return;
       polling = true;
-      APP.apiFetch("/api/notifications", { skipLoader: true })
+      APP.apiFetch("/api/notifications/unread-count", { skipLoader: true })
         .then((data) => {
-          const unread = (data.notifications || []).filter((item) => !item.read).length;
+          const unread = Number(data.unread || 0);
           updatePill(unreadBadge, unread, "#c45a2b");
           if (lastUnread != null && unread > lastUnread && window.location.pathname !== "/shared/notifications.html") {
             APP.ui?.toast?.(`${unread - lastUnread} new notification${unread - lastUnread === 1 ? "" : "s"}`, {
@@ -202,7 +204,7 @@ async function renderTopbar({ role, links }) {
     };
     pollNotifications();
     if (window.__rwNotificationBadgePoll) clearInterval(window.__rwNotificationBadgePoll);
-    window.__rwNotificationBadgePoll = setInterval(pollNotifications, 3000);
+    window.__rwNotificationBadgePoll = setInterval(pollNotifications, BADGE_POLL_MS);
   }
 
   const updatePill = (pill, count, bg) => {
@@ -221,7 +223,7 @@ async function renderTopbar({ role, links }) {
     let lastUnread = null;
     let polling = false;
     const pollMessages = () => {
-      if (polling) return;
+      if (polling || document.visibilityState === "hidden") return;
       polling = true;
       APP.apiFetch("/api/messages/unread-count", { skipLoader: true })
         .then((data) => {
@@ -241,7 +243,7 @@ async function renderTopbar({ role, links }) {
     };
     pollMessages();
     if (window.__rwMessageBadgePoll) clearInterval(window.__rwMessageBadgePoll);
-    window.__rwMessageBadgePoll = setInterval(pollMessages, 3000);
+    window.__rwMessageBadgePoll = setInterval(pollMessages, BADGE_POLL_MS);
   }
 
   if (role) document.title = `${String(role).toUpperCase()} \u2022 ${pageTitle || rawTitle}`;

@@ -1,3 +1,4 @@
+const { createRemoteJWKSet, jwtVerify } = require("jose");
 const { getSupabaseAdmin, getSupabasePublic } = require("../utils/supabase");
 const { parseCookies, setCookie } = require("../utils/httpCookies");
 
@@ -11,6 +12,9 @@ function getBearerToken(req) {
 const COOKIE_ACCESS = "rw_at";
 const COOKIE_REFRESH = "rw_rt";
 const SESSION_MAX_AGE_MS = Number(process.env.SESSION_MAX_AGE_MS || 7 * 24 * 60 * 60 * 1000);
+const AUTH_USER_CACHE_TTL_MS = Math.max(1000, Number(process.env.AUTH_USER_CACHE_TTL_MS || 15000));
+const authUserCache = new Map();
+let supabaseJwks = null;
 
 function cookieOpts() {
   const secure = String(process.env.NODE_ENV || "development") === "production";
@@ -29,8 +33,17 @@ function setSessionCookies(res, { accessToken, refreshToken }) {
 }
 
 async function verifySupabaseJwt(token) {
-  // Validate the access token via Supabase Auth using the service role key.
-  // This avoids using JWT secrets and avoids JWKS fetch issues.
+  const url = process.env.SUPABASE_URL;
+  if (url) {
+    try {
+      if (!supabaseJwks) supabaseJwks = createRemoteJWKSet(new URL(`${url}/auth/v1/.well-known/jwks.json`));
+      const { payload } = await jwtVerify(token, supabaseJwks, {
+        issuer: `${url}/auth/v1`,
+        audience: process.env.SUPABASE_JWT_AUD || "authenticated"
+      });
+      if (payload?.sub) return payload;
+    } catch {}
+  }
   const db = getSupabaseAdmin();
   const { data, error } = await db.auth.getUser(token);
   if (error) throw new Error(error.message || "Invalid token");
@@ -39,7 +52,10 @@ async function verifySupabaseJwt(token) {
 }
 
 async function loadAppUser(db, userId) {
+  const cached = authUserCache.get(userId);
+  if (cached && cached.expiresAt > Date.now()) return cached.user;
   const { data, error } = await db.from("users").select("*").eq("id", userId).single();
+  if (!error && data) authUserCache.set(userId, { user: data, expiresAt: Date.now() + AUTH_USER_CACHE_TTL_MS });
   if (error) return null;
   return data;
 }
