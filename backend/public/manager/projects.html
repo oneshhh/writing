@@ -13,48 +13,81 @@
   </head>
   <body>
     <div class="topbar" id="topbar"></div>
-    <div class="wrap">
-      <div class="grid">
-        <div class="card" style="grid-column: span 6">
-          <h2>Create Project</h2>
+    <div class="wrap wide">
+      <main class="projects-page">
+        <section class="projects-page-head">
           <div>
-            <label class="muted">Title</label>
-            <input id="title" />
+            <h1>Projects</h1>
+            <p>Create new editorial rooms, choose review checks, and keep your active workspaces organized in one place.</p>
           </div>
-          <div style="margin-top: 10px">
-            <label class="muted">Description</label>
-            <textarea id="desc"></textarea>
-          </div>
-          <div class="two" style="margin-top: 10px">
-            <label class="pill"><input type="checkbox" id="ai" /> AI check enabled</label>
-            <label class="pill"><input type="checkbox" id="plag" /> Plagiarism check enabled</label>
-          </div>
-          <div style="margin-top: 14px">
-            <label class="muted">Add managers now (optional)</label>
-            <input id="managerSearch" placeholder="search manager name or email..." />
-            <div class="muted" id="selectedManagers" style="margin-top:8px"></div>
-            <div
-              style="margin-top: 10px; max-height: 220px; overflow: auto; border: 1px solid rgba(229,226,225,0.95); border-radius: 16px; background: rgba(255,255,255,.65)"
-            >
-              <table style="margin: 0">
-                <thead><tr><th>Manager</th><th></th></tr></thead>
-                <tbody id="managerRows"></tbody>
-              </table>
+        </section>
+
+        <div class="projects-layout">
+          <section class="card projects-create-card">
+            <p class="projects-kicker">Create Project</p>
+            <div class="projects-form">
+              <div class="projects-field">
+                <label for="title">Title</label>
+                <input id="title" placeholder="e.g. Q4 Market Analysis" />
+              </div>
+
+              <div class="projects-field">
+                <label for="desc">Description</label>
+                <textarea id="desc" placeholder="Briefly describe the project scope..."></textarea>
+              </div>
+
+              <div class="projects-toggle-grid">
+                <div class="projects-toggle-card">
+                  <div class="projects-toggle-copy">
+                    <strong>AI Check</strong>
+                    <span>Run AI screening for submitted articles.</span>
+                  </div>
+                  <label class="projects-switch" aria-label="Toggle AI check">
+                    <input type="checkbox" id="ai" />
+                    <span class="projects-switch-slider"></span>
+                  </label>
+                </div>
+
+                <div class="projects-toggle-card">
+                  <div class="projects-toggle-copy">
+                    <strong>Plagiarism</strong>
+                    <span>Check originality before approval.</span>
+                  </div>
+                  <label class="projects-switch" aria-label="Toggle plagiarism check">
+                    <input type="checkbox" id="plag" />
+                    <span class="projects-switch-slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="projects-field">
+                <label for="managerSearch">Add Managers (Optional)</label>
+                <div class="projects-search">
+                  <span class="material-symbols-outlined" aria-hidden="true">search</span>
+                  <input id="managerSearch" placeholder="Search manager name or email..." />
+                </div>
+                <div id="selectedManagers" class="projects-selected"></div>
+                <div class="projects-manager-list">
+                  <div id="managerRows" class="projects-manager-rows"></div>
+                </div>
+              </div>
+
+              <button id="create" class="projects-create-btn" type="button">Create Project</button>
+              <div class="muted projects-form-msg" id="msg"></div>
             </div>
-          </div>
-          <div class="right" style="margin-top: 12px">
-            <button id="create">Create</button>
-          </div>
-          <div class="muted" id="msg" style="margin-top: 10px"></div>
+          </section>
+
+          <section class="card projects-list-card">
+            <div class="projects-list-head">
+              <div>
+                <p class="projects-kicker" style="margin-bottom:8px">My Projects</p>
+                <div class="projects-count"><span class="material-symbols-outlined" aria-hidden="true">folder_copy</span><span id="projectCount">0 workspaces</span></div>
+              </div>
+            </div>
+            <div id="rows" class="projects-list"></div>
+          </section>
         </div>
-        <div class="card" style="grid-column: span 6">
-          <h2>My Projects</h2>
-          <table>
-            <thead><tr><th>Title</th><th>Status</th><th></th></tr></thead>
-            <tbody id="rows"></tbody>
-          </table>
-        </div>
-      </div>
+      </main>
     </div>
     <script>
       (async function () {
@@ -65,30 +98,60 @@
         const msg = (t) => (document.getElementById("msg").textContent = t || "");
         let allManagers = [];
         const selectedManagerIds = new Set();
+        const managerRows = document.getElementById("managerRows");
+        const projectRows = document.getElementById("rows");
+
+        function formatDate(value) {
+          if (!value) return "Recently created";
+          const date = new Date(value);
+          if (Number.isNaN(date.getTime())) return "Recently created";
+          return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+        }
+
+        function statusLabel(status) {
+          const text = String(status || "active").replace(/_/g, " ").trim();
+          return text ? text[0].toUpperCase() + text.slice(1) : "Active";
+        }
+
+        function renderProjectSkeleton() {
+          projectRows.innerHTML = Array.from({ length: 3 })
+            .map(
+              () => `<article class="project-row-card is-skeleton">
+                <span class="rw-skeleton project-row-skeleton-title"></span>
+                <span class="rw-skeleton project-row-skeleton-line"></span>
+                <span class="rw-skeleton project-row-skeleton-line" style="width:84%"></span>
+              </article>`
+            )
+            .join("");
+        }
 
         function renderSelectedManagers() {
           const selected = allManagers.filter((m) => selectedManagerIds.has(m.id));
-          document.getElementById("selectedManagers").textContent = selected.length
-            ? `Selected: ${selected.map((m) => m.full_name || m.email).join(", ")}`
-            : "No extra managers selected.";
+          document.getElementById("selectedManagers").innerHTML = selected.length
+            ? selected
+                .map((m) => `<span class="projects-chip">${APP.escapeHtml(m.full_name || m.email || "Manager")}</span>`)
+                .join("")
+            : `<span class="projects-selected-empty">No extra managers selected.</span>`;
         }
 
         function renderManagerRows() {
-          document.getElementById("managerRows").innerHTML = allManagers.length
-            ? allManagers
-                .filter((m) => m.id !== user.id)
-                .map(
-                  (m) => `<tr>
-                    <td>${APP.escapeHtml(m.full_name || "Manager")}<div class="muted">${APP.escapeHtml(m.email || "")}</div></td>
-                    <td class="right">
-                      <button class="secondary" data-manager="${m.id}">
-                        ${selectedManagerIds.has(m.id) ? "Remove" : "Add"}
-                      </button>
-                    </td>
-                  </tr>`
-                )
+          const visibleManagers = allManagers.filter((m) => m.id !== user.id);
+          managerRows.innerHTML = visibleManagers.length
+            ? visibleManagers
+                .map((m) => {
+                  const isSelected = selectedManagerIds.has(m.id);
+                  return `<article class="projects-manager-row">
+                    <div>
+                      <div class="projects-manager-name">${APP.escapeHtml(m.full_name || "Manager")}</div>
+                      <div class="projects-manager-email">${APP.escapeHtml(m.email || "")}</div>
+                    </div>
+                    <button class="secondary projects-add-btn ${isSelected ? "is-selected" : ""}" data-manager="${m.id}" type="button">
+                      ${isSelected ? "Remove" : "Add"}
+                    </button>
+                  </article>`;
+                })
                 .join("")
-            : "<tr><td colspan='2' class='muted'>No managers found.</td></tr>";
+            : `<article class="project-row-card is-empty"><div class="project-row-empty">No managers found for that search.</div></article>`;
 
           for (const b of document.querySelectorAll("button[data-manager]")) {
             b.onclick = () => {
@@ -109,18 +172,44 @@
         }
 
         async function refresh() {
-          APP.ui.tableSkeleton("rows", { rows: 8, cols: 3 });
+          renderProjectSkeleton();
           const projects = await APP.apiFetch("/api/projects");
-          document.getElementById("rows").innerHTML = (projects.projects || [])
-            .map((p) => `<tr>
-              <td>${APP.escapeHtml(p.title)}</td>
-              <td class="muted">${APP.escapeHtml(p.status)}</td>
-              <td class="right">
-                <a href="/manager/project-detail.html?id=${encodeURIComponent(p.id)}"><button class="secondary">Open</button></a>
-                <button class="danger" data-delete="${p.id}" data-title="${APP.escapeHtml(p.title)}">Delete</button>
-              </td>
-            </tr>`)
-            .join("");
+          const rows = projects.projects || [];
+          document.getElementById("projectCount").textContent = `${rows.length} workspace${rows.length === 1 ? "" : "s"}`;
+          projectRows.innerHTML = rows.length
+            ? rows
+                .map((p) => {
+                  const description = String(p.description || "").trim() || "No description added yet for this project.";
+                  return `<article class="project-row-card">
+                    <div class="project-row-card-head">
+                      <div>
+                        <h3 class="project-row-title">${APP.escapeHtml(p.title || "Untitled project")}</h3>
+                      </div>
+                      <span class="project-row-status" data-status="${APP.escapeHtml(String(p.status || "active").toLowerCase())}">${APP.escapeHtml(
+                        statusLabel(p.status)
+                      )}</span>
+                    </div>
+                    <p class="project-row-summary">${APP.escapeHtml(description)}</p>
+                    <div class="project-row-meta">
+                      <span><span class="material-symbols-outlined" aria-hidden="true">event</span>${APP.escapeHtml(formatDate(p.created_at))}</span>
+                      <span><span class="material-symbols-outlined" aria-hidden="true">person</span>Manager workspace</span>
+                    </div>
+                    <div class="project-row-checks">
+                      <span><span class="material-symbols-outlined" aria-hidden="true">${p.ai_check_enabled ? "check_circle" : "radio_button_unchecked"}</span>AI check ${
+                        p.ai_check_enabled ? "on" : "off"
+                      }</span>
+                      <span><span class="material-symbols-outlined" aria-hidden="true">${
+                        p.plagiarism_check_enabled ? "check_circle" : "radio_button_unchecked"
+                      }</span>Plagiarism ${p.plagiarism_check_enabled ? "on" : "off"}</span>
+                    </div>
+                    <div class="project-row-actions">
+                      <a href="/manager/project-detail.html?id=${encodeURIComponent(p.id)}"><button class="secondary project-row-open" type="button">Open</button></a>
+                      <button class="project-row-delete" data-delete="${p.id}" data-title="${APP.escapeHtml(p.title || "this project")}" type="button">Delete</button>
+                    </div>
+                  </article>`;
+                })
+                .join("")
+            : `<article class="project-row-card is-empty"><div class="project-row-empty">No projects yet. Create your first workspace from the form on the left.</div></article>`;
           for (const b of document.querySelectorAll("button[data-delete]")) {
             b.onclick = async () => {
               msg("");
@@ -149,13 +238,21 @@
               plagiarism_check_enabled: document.getElementById("plag").checked,
               manager_ids: Array.from(selectedManagerIds)
             };
-            await APP.apiFetch("/api/projects", { method: "POST", body: JSON.stringify(body) });
+            await APP.ui.runActionOverlay({
+              title: "Creating project...",
+              sub: "Saving the new workspace",
+              successSymbol: "done_all",
+              errorSymbol: "error",
+              action: async () => APP.apiFetch("/api/projects", { method: "POST", body: JSON.stringify(body) })
+            });
             document.getElementById("title").value = "";
             document.getElementById("desc").value = "";
             document.getElementById("ai").checked = false;
             document.getElementById("plag").checked = false;
+            document.getElementById("managerSearch").value = "";
             selectedManagerIds.clear();
             renderSelectedManagers();
+            await loadManagers("");
             await refresh();
             msg("Created.");
           } catch (e) {
