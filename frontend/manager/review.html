@@ -40,6 +40,7 @@
               <div class="badge" id="status"></div>
               <h1 id="title"></h1>
               <div class="muted review-short" id="short"></div>
+              <div class="muted review-short hidden" id="writerMeta"></div>
               <div class="muted review-short hidden" id="requestMeta"></div>
             </div>
             <div class="review-score-row">
@@ -116,6 +117,16 @@
           return `/manager/review.html?id=${encodeURIComponent(id)}`;
         }
 
+        function writerLabel(article) {
+          const fullName = String(article?.writer?.full_name || "").trim();
+          if (fullName) return fullName;
+          const email = String(article?.writer?.email || "").trim();
+          if (email) return email;
+          const uniqueId = String(article?.writer?.unique_id || "").trim();
+          if (uniqueId) return uniqueId;
+          return "";
+        }
+
         function showQueue() {
           selected = null;
           queueCard.classList.remove("hidden");
@@ -150,6 +161,7 @@
               (a) => `<article class="review-queue-item">
                 <div class="review-queue-title">${APP.escapeHtml(a.title || "Untitled")}</div>
                 <div class="muted review-queue-summary">${APP.escapeHtml(a.short_description || "")}</div>
+                ${writerLabel(a) ? `<div class="muted review-queue-summary">Written by ${APP.escapeHtml(writerLabel(a))}</div>` : ""}
                 ${a.request_id ? `<div class="muted review-queue-summary">Request submission${a.request_title ? ` - ${APP.escapeHtml(a.request_title)}` : ""}</div>` : ""}
                 <div class="review-queue-meta">
                   <span class="pill">AI: ${APP.checkBadge(a.ai_score)}</span>
@@ -184,6 +196,9 @@
           document.getElementById("status").innerHTML = APP.badgeForStatus(a.status);
           document.getElementById("title").textContent = a.title || "";
           document.getElementById("short").textContent = a.short_description || "";
+          const writer = writerLabel(a);
+          document.getElementById("writerMeta").textContent = writer ? `Written by ${writer}` : "";
+          document.getElementById("writerMeta").classList.toggle("hidden", !writer);
           document.getElementById("requestMeta").textContent = a.request_id
             ? `Submitted for request${a.request_title ? `: ${a.request_title}` : ""}`
             : "";

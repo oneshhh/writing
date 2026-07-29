@@ -1671,6 +1671,18 @@ button.planner-day {
   border-color: rgba(255, 255, 255, 0.98) transparent transparent transparent;
 }
 
+.planner-day[data-tooltip-placement="bottom"] .planner-tooltip {
+  top: calc(100% + 10px);
+  bottom: auto;
+}
+
+.planner-day[data-tooltip-placement="bottom"] .planner-tooltip::after {
+  top: auto;
+  bottom: 100%;
+  border-width: 0 7px 8px 7px;
+  border-color: transparent transparent rgba(255, 255, 255, 0.98) transparent;
+}
+
 .planner-day:hover .planner-tooltip,
 .planner-day:focus-within .planner-tooltip,
 .planner-day:focus-visible .planner-tooltip {
@@ -1779,7 +1791,7 @@ button.planner-day {
 
 .chat-search-wrap .material-symbols-outlined {
   position: absolute;
-  left: 14px;
+  left: 18px;
   top: 50%;
   transform: translateY(-50%);
   color: var(--rw-muted);
@@ -1788,7 +1800,7 @@ button.planner-day {
 }
 
 .chat-search-wrap input {
-  padding-left: 42px;
+  padding-left: 56px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.88);
   box-shadow: none;

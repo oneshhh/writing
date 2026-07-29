@@ -59,6 +59,7 @@
         let cursor = new Date();
         cursor = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
         const projectFilter = document.getElementById("projectFilter");
+        const calendarShell = document.querySelector(".calendar-shell");
 
         function key(d) {
           const y = d.getFullYear();
@@ -102,6 +103,34 @@
               )
               .join("")}
           </div>`;
+        }
+
+        function measureTooltip(tooltip) {
+          const display = tooltip.style.display;
+          const visibility = tooltip.style.visibility;
+          tooltip.style.display = "grid";
+          tooltip.style.visibility = "hidden";
+          const rect = tooltip.getBoundingClientRect();
+          tooltip.style.display = display;
+          tooltip.style.visibility = visibility;
+          return rect;
+        }
+
+        function applyTooltipPlacement() {
+          if (!calendarShell) return;
+          const shellRect = calendarShell.getBoundingClientRect();
+          const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+          for (const day of document.querySelectorAll(".planner-day")) {
+            const tooltip = day.querySelector(".planner-tooltip");
+            if (!tooltip) continue;
+
+            const tooltipRect = measureTooltip(tooltip);
+            const dayRect = day.getBoundingClientRect();
+            const topSpace = dayRect.top - shellRect.top;
+            const bottomSpace = Math.min(shellRect.bottom, viewportHeight) - dayRect.bottom;
+            const needsBottomPlacement = topSpace < tooltipRect.height + 18 && bottomSpace > topSpace;
+            day.dataset.tooltipPlacement = needsBottomPlacement ? "bottom" : "top";
+          }
         }
 
         async function loadProjects() {
@@ -155,6 +184,7 @@
 
           document.getElementById("plannerGrid").innerHTML = cells.join("");
           document.getElementById("monthLabel").textContent = monthLabel();
+          applyTooltipPlacement();
         }
 
         async function load() {
@@ -177,6 +207,7 @@
           await load();
         };
         projectFilter.onchange = load;
+        window.addEventListener("resize", applyTooltipPlacement);
         await loadProjects();
         await load();
       })();

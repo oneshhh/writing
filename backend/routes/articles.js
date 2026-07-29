@@ -100,6 +100,24 @@ async function getProjectManagerIds(db, projectId, createdBy) {
   return Array.from(ids);
 }
 
+async function attachWriters(db, articles) {
+  const rows = Array.isArray(articles) ? articles : [];
+  const writerIds = Array.from(new Set(rows.map((article) => article?.writer_id).filter(Boolean)));
+  if (!writerIds.length) return rows.map((article) => ({ ...article, writer: null }));
+
+  const { data: users, error } = await db
+    .from("users")
+    .select("id,full_name,email,unique_id")
+    .in("id", writerIds);
+  if (error) throw new Error(error.message);
+
+  const usersById = new Map((users || []).map((user) => [user.id, user]));
+  return rows.map((article) => ({
+    ...article,
+    writer: usersById.get(article.writer_id) || null
+  }));
+}
+
 async function notifyRequestManagers(db, { article, request, actor }) {
   const managerIds = await getProjectManagerIds(db, article.project_id, request.created_by);
   if (!managerIds.length) return;
@@ -186,7 +204,12 @@ router.get("/", async (req, res) => {
     if (usePaging) q = q.range(rangeFrom, rangeTo);
     const { data, error, count } = await q;
     if (error) return res.status(400).json({ error: error.message });
-    return res.json({ articles: data, total: count ?? null, limit: usePaging ? limit : null, offset: usePaging ? rangeFrom : null });
+    try {
+      const articles = await attachWriters(db, data || []);
+      return res.json({ articles, total: count ?? null, limit: usePaging ? limit : null, offset: usePaging ? rangeFrom : null });
+    } catch (e) {
+      return res.status(400).json({ error: e.message || String(e) });
+    }
   }
 
   // admin
@@ -418,11 +441,21 @@ router.get("/:id", authorizeRoles("writer", "manager", "admin"), async (req, res
     } catch (e) {
       return res.status(e.status || 400).json({ error: e.message || "Forbidden" });
     }
-    return res.json({ article });
+    try {
+      const [articleWithWriter] = await attachWriters(db, [article]);
+      return res.json({ article: articleWithWriter });
+    } catch (e) {
+      return res.status(400).json({ error: e.message || String(e) });
+    }
   }
 
   // admin
-  return res.json({ article });
+  try {
+    const [articleWithWriter] = await attachWriters(db, [article]);
+    return res.json({ article: articleWithWriter });
+  } catch (e) {
+    return res.status(400).json({ error: e.message || String(e) });
+  }
 });
 
 router.delete("/:id", authorizeRoles("admin"), async (req, res) => {
