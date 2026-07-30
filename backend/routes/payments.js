@@ -7,6 +7,7 @@ const { getManagerProjectIds, requireManagerProjectAccess } = require("../utils/
 
 const upload = multer({ storage: multer.memoryStorage() });
 const router = express.Router();
+const APP_NAME = process.env.APP_NAME || "Real Write";
 
 function parseCommonFilters(req) {
   const projectIdFilter = req.query.project_id ? String(req.query.project_id) : null;
@@ -120,7 +121,7 @@ async function markPaymentPaid({ db, payment, actor, paymentId, proofUrl }) {
       request_id: updated.request_id || null,
       project_id: updated.project_id
     },
-    emailSubject: "Real Write: payment approved",
+    emailSubject: `${APP_NAME}: payment approved`,
     emailText: `Your payment has been approved for ${paymentTarget}.${updated.payment_id ? ` Payment ID: ${updated.payment_id}` : ""}`
   });
 

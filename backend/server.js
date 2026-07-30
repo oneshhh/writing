@@ -3,10 +3,13 @@ const cors = require("cors");
 const morgan = require("morgan");
 const path = require("path");
 require("dotenv").config();
+require("./utils/runtimeConfig").loadRuntimeConfigIntoEnv();
 
 const { authenticate } = require("./middleware/authenticate");
+const { ensureAppReady, getSetupState } = require("./services/appSetup");
 
 const authRoutes = require("./routes/auth");
+const setupRoutes = require("./routes/setup");
 const usersRoutes = require("./routes/users");
 const projectsRoutes = require("./routes/projects");
 const articlesRoutes = require("./routes/articles");
@@ -68,9 +71,40 @@ app.use(
     }
   })
 );
-app.get("/", (req, res) => res.redirect("/login.html"));
 
-app.get("/health", (req, res) => res.json({ ok: true }));
+app.get("/", async (_req, res) => {
+  try {
+    const state = await getSetupState();
+    return res.redirect(state.ready ? "/login.html" : "/setup.html");
+  } catch {
+    return res.redirect("/setup.html");
+  }
+});
+
+app.get("/health", async (_req, res) => {
+  try {
+    const state = await getSetupState();
+    return res.json({ ok: state.ready, setup: state });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message || "Setup check failed" });
+  }
+});
+
+app.use("/api/setup", setupRoutes);
+
+app.use("/api", async (req, res, next) => {
+  try {
+    if (req.path.startsWith("/setup")) return next();
+    const state = await getSetupState();
+    if (state.ready) return next();
+    return res.status(503).json({
+      error: "The application setup is incomplete. Finish setup at /setup.html before using the API.",
+      setup_required: true
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message || "Setup status unavailable" });
+  }
+});
 
 app.use("/api/auth", authenticate.optional, authRoutes);
 app.use("/api/users", authenticate.required, usersRoutes);
@@ -94,10 +128,17 @@ app.use((err, req, res, next) => {
 });
 
 if (!process.env.VERCEL) {
-  app.listen(port, () => {
-    // eslint-disable-next-line no-console
-    console.log(`API listening on http://localhost:${port}`);
-  });
+  ensureAppReady()
+    .catch((error) => {
+      // eslint-disable-next-line no-console
+      console.error(`Startup bootstrap warning: ${error.message || error}`);
+    })
+    .finally(() => {
+      app.listen(port, () => {
+        // eslint-disable-next-line no-console
+        console.log(`API listening on http://localhost:${port}`);
+      });
+    });
 }
 
 module.exports = app;

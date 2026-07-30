@@ -1,10 +1,26 @@
 /* global APP */
 
 const BADGE_POLL_MS = 15000;
+let cachedAppName = null;
+
+async function resolveAppName() {
+  if (cachedAppName) return cachedAppName;
+  const fallback = window.APP_CONFIG?.appName || "Real Write";
+  try {
+    const res = await fetch("/api/setup/status", { cache: "no-store", credentials: "include" });
+    const body = await res.json().catch(() => ({}));
+    cachedAppName = String(body?.app_name || fallback).trim() || fallback;
+    return cachedAppName;
+  } catch {
+    cachedAppName = fallback;
+    return cachedAppName;
+  }
+}
 
 async function renderTopbar({ role, links }) {
   const bar = document.getElementById("topbar");
   if (!bar) return;
+  const appName = await resolveAppName();
 
   const guessIcon = (label, href) => {
     const l = String(label || "").toLowerCase();
@@ -89,10 +105,10 @@ async function renderTopbar({ role, links }) {
   bar.className = "rw-shell";
   bar.innerHTML = `
     <aside class="rw-sidebar" aria-label="Primary navigation">
-      <a class="rw-brand" href="${role ? `/${encodeURIComponent(role)}/dashboard.html` : "/login.html"}" aria-label="Real Write home">
-        <img class="rw-brand-logo" src="/assets/realwrite-logo.png" alt="Real Write logo" loading="eager" decoding="async" />
+      <a class="rw-brand" href="${role ? `/${encodeURIComponent(role)}/dashboard.html` : "/login.html"}" aria-label="${APP.escapeHtml(appName)} home">
+        <img class="rw-brand-logo" src="/assets/realwrite-logo.png" alt="${APP.escapeHtml(appName)} logo" loading="eager" decoding="async" />
         <span>
-          <span class="rw-brand-name">Real Write</span>
+          <span class="rw-brand-name">${APP.escapeHtml(appName)}</span>
           <span class="rw-brand-sub">${role ? APP.escapeHtml(String(role).toUpperCase()) : "Editorial Suite"}</span>
         </span>
       </a>

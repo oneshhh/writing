@@ -133,19 +133,13 @@
       ></div>
       <div class="relative z-10 max-w-xl text-center space-y-lg">
         <div class="mb-xl flex justify-center">
-          <a
-            class="inline-flex items-center justify-center"
-            href="https://www.linkedin.com/company/realwrite"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Real Write on LinkedIn"
-          >
+          <div class="inline-flex items-center justify-center" aria-label="Real Write">
             <img
               alt="Real Write"
               class="h-24 w-auto object-contain"
               src="/assets/realwrite-logo.png"
             />
-          </a>
+          </div>
         </div>
         <div class="space-y-sm">
           <h2 class="font-display-lg text-display-lg text-primary italic leading-tight">Real Write</h2>
@@ -170,10 +164,10 @@
           </div>
         </div>
       </div>
-    </section>
+      </section>
 
-    <div class="md:hidden w-full p-margin-mobile flex justify-between items-center bg-surface-container-low border-b border-outline-variant">
-      <a href="https://www.linkedin.com/company/realwrite" target="_blank" rel="noopener noreferrer" aria-label="Real Write on LinkedIn">
+      <div class="md:hidden w-full p-margin-mobile flex justify-center items-center bg-surface-container-low border-b border-outline-variant">
+      <div aria-label="Real Write">
         <div class="flex items-center gap-3">
         <img
           alt="Real Write"
@@ -182,17 +176,8 @@
         />
         <span class="font-display-lg-mobile text-display-lg-mobile text-primary italic">Real Write</span>
         </div>
-      </a>
-      <a
-        class="inline-flex items-center gap-xs font-label-sm text-label-sm uppercase tracking-widest text-outline hover:text-primary transition-soft"
-        href="https://www.linkedin.com/company/realwrite"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        <span class="material-symbols-outlined text-[18px]">link</span>
-        LinkedIn
-      </a>
-    </div>
+      </div>
+      </div>
 
     <main class="w-full md:w-1/2 lg:w-2/5 flex flex-col items-center justify-center px-margin-mobile py-xl md:px-xl bg-surface">
       <div class="w-full max-w-md space-y-lg">
@@ -200,6 +185,13 @@
           <h1 class="font-headline-md text-headline-md text-primary">Welcome back.</h1>
           <p class="font-body-md text-body-md text-on-surface-variant">Please enter your credentials to continue.</p>
         </header>
+
+        <div
+          class="rounded-lg border border-primary/15 bg-surface-container-low text-on-surface-variant font-body-md text-body-md px-4 py-3 hidden"
+          id="setupBox"
+          role="status"
+          aria-live="polite"
+        ></div>
 
         <form class="space-y-md" id="loginForm">
           <div class="space-y-xs">
@@ -259,15 +251,6 @@
           <div class="pt-lg border-t border-outline-variant flex flex-wrap justify-center gap-md">
             <a class="font-label-sm text-label-sm text-outline hover:text-primary transition-soft uppercase" href="/privacy.html">Privacy Policy</a>
             <a class="font-label-sm text-label-sm text-outline hover:text-primary transition-soft uppercase" href="/terms.html">Terms of Service</a>
-            <a
-              class="font-label-sm text-label-sm text-outline hover:text-primary transition-soft uppercase inline-flex items-center gap-xs"
-              href="https://www.linkedin.com/company/realwrite"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <span class="material-symbols-outlined text-[16px]">link</span>
-              LinkedIn
-            </a>
           </div>
         </footer>
       </div>
@@ -330,8 +313,30 @@
         window.location.href = `/${encodeURIComponent(role)}/dashboard.html`;
       }
 
+      async function ensureSetupReady() {
+        const box = document.getElementById("setupBox");
+        const res = await fetch("/api/setup/status", { cache: "no-store" });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body?.error || "Could not check workspace setup.");
+        if (body?.ready) return true;
+        if (box) {
+          box.innerHTML =
+            'This workspace has not been configured yet. Continue to <a class="underline font-semibold" href="/setup.html">first-time setup</a> to connect your database and create the first admin account.';
+          box.classList.remove("hidden");
+        }
+        window.location.href = "/setup.html";
+        return false;
+      }
+
       (async function () {
         hookLabelColor();
+        try {
+          const ready = await ensureSetupReady();
+          if (!ready) return;
+        } catch (error) {
+          showError(error?.message || "Could not verify workspace setup.");
+          return;
+        }
         try {
           // If already authenticated via cookies, go straight to the dashboard.
           await redirectToDashboard();

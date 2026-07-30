@@ -1,2 +1,5 @@
 .npm-cache/
 backend/node_modules/
+backend/.env
+backend/.runtime-config.json
+.env

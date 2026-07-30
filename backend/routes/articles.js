@@ -9,6 +9,7 @@ const { createNotification } = require("../services/notifications");
 const { getManagerProjectIds, requireManagerProjectAccess } = require("../utils/projectAccess");
 
 const router = express.Router();
+const APP_NAME = process.env.APP_NAME || "Real Write";
 
 async function nextArticleUniqueId(db, projectId) {
   const prefix = `ART-${projectId}-`;
@@ -712,7 +713,7 @@ router.post("/:id/review", authorizeRoles("manager"), async (req, res) => {
         ? `Your article "${updated.title}" was approved.`
         : `Your article "${updated.title}" was marked as ${action}. ${manager_note ? "Note: " + manager_note : ""}`.trim(),
     payload: { article_id: updated.id, project_id: updated.project_id },
-    emailSubject: `Real Write: article ${action}`,
+    emailSubject: `${APP_NAME}: article ${action}`,
     emailText:
       action === "approved"
         ? `Your article "${updated.title}" was approved.`

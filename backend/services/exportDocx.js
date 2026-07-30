@@ -3,6 +3,8 @@ const path = require("path");
 const { AlignmentType, Document, HeadingLevel, ImageRun, Packer, Paragraph, TextRun } = require("docx");
 const { getExportMeta, parseHtmlToBlocks } = require("./exportArticleTemplate");
 
+const APP_NAME = process.env.APP_NAME || "Real Write";
+
 const COLORS = {
   primary: "0D2B22",
   primary2: "476459",
@@ -59,7 +61,7 @@ async function exportArticleDocxBuffer({ article, writerName, projectTitle, down
     new Paragraph({
       alignment: AlignmentType.CENTER,
       spacing: { after: 120 },
-      children: [logo, new TextRun({ text: logo ? "  Real Write" : "Real Write", bold: true, color: COLORS.primary, size: 26 })].filter(Boolean)
+      children: [logo, new TextRun({ text: logo ? `  ${APP_NAME}` : APP_NAME, bold: true, color: COLORS.primary, size: 26 })].filter(Boolean)
     }),
     new Paragraph({
       heading: HeadingLevel.TITLE,

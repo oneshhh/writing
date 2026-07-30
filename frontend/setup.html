@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/png" href="/assets/realwrite-logo.png" />
+    <link rel="apple-touch-icon" href="/assets/realwrite-logo.png" />
+    <title>Real Write | First-Time Setup</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+    <style>
+      .setup-shell {
+        max-width: 1180px;
+        margin: 0 auto;
+        display: grid;
+        gap: 24px;
+      }
+
+      .setup-hero {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 24px;
+        flex-wrap: wrap;
+      }
+
+      .setup-hero h1 {
+        margin: 0 0 10px;
+        color: var(--rw-primary);
+        font-size: clamp(34px, 5vw, 56px);
+        line-height: 1.02;
+        font-weight: 900;
+        letter-spacing: -0.05em;
+      }
+
+      .setup-hero p {
+        margin: 0;
+        max-width: 760px;
+        color: var(--rw-muted);
+        font-size: 15px;
+        line-height: 1.7;
+      }
+
+      .setup-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.9fr);
+        gap: 24px;
+        align-items: start;
+      }
+
+      .setup-card-stack {
+        display: grid;
+        gap: 18px;
+      }
+
+      .setup-kicker {
+        margin: 0 0 16px;
+        color: var(--rw-muted);
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .setup-form {
+        display: grid;
+        gap: 18px;
+      }
+
+      .setup-section {
+        display: grid;
+        gap: 12px;
+        padding: 18px;
+        border: 1px solid rgba(229, 226, 225, 0.95);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.56);
+      }
+
+      .setup-section h2 {
+        margin: 0;
+        font-size: 20px;
+      }
+
+      .setup-section p {
+        margin: 0;
+        color: var(--rw-muted);
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      .setup-field {
+        display: grid;
+        gap: 8px;
+      }
+
+      .setup-field label {
+        color: var(--rw-muted);
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .setup-note {
+        padding: 14px 16px;
+        border: 1px solid rgba(193, 200, 195, 0.85);
+        border-radius: 16px;
+        background: rgba(246, 243, 242, 0.8);
+        color: var(--rw-muted-2);
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      .setup-status-list {
+        display: grid;
+        gap: 12px;
+      }
+
+      .setup-status-item {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 14px 16px;
+        border: 1px solid rgba(229, 226, 225, 0.95);
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.78);
+      }
+
+      .setup-status-item strong {
+        display: block;
+        color: var(--rw-text);
+        font-size: 14px;
+        margin-bottom: 4px;
+      }
+
+      .setup-status-item span {
+        color: var(--rw-muted);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .setup-issues {
+        display: grid;
+        gap: 10px;
+      }
+
+      .setup-issues div {
+        padding: 12px 14px;
+        border-radius: 14px;
+        background: rgba(255, 218, 214, 0.8);
+        border: 1px solid rgba(186, 26, 26, 0.18);
+        color: #8c1d18;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .setup-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .setup-actions a {
+        color: var(--rw-primary);
+        font-weight: 700;
+      }
+
+      .setup-msg {
+        min-height: 20px;
+      }
+
+      @media (max-width: 960px) {
+        .setup-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap wide" style="padding-top: 28px; padding-bottom: 40px">
+      <main class="setup-shell">
+        <section class="setup-hero">
+          <div>
+            <p class="setup-kicker">Open-Source Setup</p>
+            <h1>Prepare Your Workspace</h1>
+            <p>
+              Connect your own Supabase project, point the app to your PostgreSQL database, and create the first admin account. Once this is complete, the rest of the product can be run from your own server with your own data.
+            </p>
+          </div>
+          <div class="pill">
+            <span class="material-symbols-outlined" aria-hidden="true">deployed_code</span>
+            Self-hosted deployment
+          </div>
+        </section>
+
+        <div class="setup-grid">
+          <section class="card">
+            <form class="setup-form" id="setupForm">
+              <section class="setup-section">
+                <div>
+                  <h2>Deployment Configuration</h2>
+                  <p>Use a hosted Supabase project or a self-hosted/local Supabase stack. The application expects Supabase Auth plus a PostgreSQL database connection for schema bootstrapping.</p>
+                </div>
+
+                <div class="setup-field">
+                  <label for="app_name">Application Name</label>
+                  <input id="app_name" placeholder="Editorial Workspace" />
+                </div>
+
+                <div class="two">
+                  <div class="setup-field">
+                    <label for="app_url">Public App URL</label>
+                    <input id="app_url" placeholder="https://your-domain.com" />
+                  </div>
+                  <div class="setup-field">
+                    <label for="cors_origins">CORS Origins</label>
+                    <input id="cors_origins" placeholder="https://your-domain.com,http://localhost:3000" />
+                  </div>
+                </div>
+
+                <div class="setup-field">
+                  <label for="supabase_url">Supabase URL</label>
+                  <input id="supabase_url" placeholder="https://your-project.supabase.co" />
+                </div>
+
+                <div class="two">
+                  <div class="setup-field">
+                    <label for="supabase_anon_key">Supabase Anon Key</label>
+                    <textarea id="supabase_anon_key" placeholder="Paste your anon key"></textarea>
+                  </div>
+                  <div class="setup-field">
+                    <label for="supabase_service_role_key">Supabase Service Role Key</label>
+                    <textarea id="supabase_service_role_key" placeholder="Paste your service role key"></textarea>
+                  </div>
+                </div>
+
+                <div class="setup-field">
+                  <label for="database_url">Database URL</label>
+                  <input id="database_url" placeholder="postgresql://postgres:password@localhost:5432/realwrite" />
+                </div>
+
+                <div class="setup-note">
+                  Use either the full database URL above or the host/port fields below. This lets teams run the same app against hosted PostgreSQL, self-hosted Supabase, or a local Docker-based Postgres service.
+                </div>
+
+                <div class="setup-note">
+                  Production tip: prefer real environment variables on your server. The setup page can write a local runtime config file for convenience, but that file contains secrets and should stay private to your deployment.
+                </div>
+
+                <div class="two">
+                  <div class="setup-field">
+                    <label for="db_host">DB Host</label>
+                    <input id="db_host" placeholder="localhost" />
+                  </div>
+                  <div class="setup-field">
+                    <label for="db_port">DB Port</label>
+                    <input id="db_port" placeholder="5432" />
+                  </div>
+                </div>
+
+                <div class="two">
+                  <div class="setup-field">
+                    <label for="db_user">DB User</label>
+                    <input id="db_user" placeholder="postgres" />
+                  </div>
+                  <div class="setup-field">
+                    <label for="db_password">DB Password</label>
+                    <input id="db_password" type="password" placeholder="Database password" />
+                  </div>
+                </div>
+
+                <div class="two">
+                  <div class="setup-field">
+                    <label for="db_name">DB Name</label>
+                    <input id="db_name" placeholder="postgres" />
+                  </div>
+                  <div class="setup-field">
+                    <label for="db_ssl">DB SSL</label>
+                    <select id="db_ssl">
+                      <option value="">Auto</option>
+                      <option value="false">Disabled</option>
+                      <option value="true">Required</option>
+                    </select>
+                  </div>
+                </div>
+              </section>
+
+              <section class="setup-section">
+                <div>
+                  <h2>Optional Integrations</h2>
+                  <p>AI detection and deployment tokens are optional. The application can run without them.</p>
+                </div>
+
+                <div class="setup-field">
+                  <label for="huggingface_api_token">Hugging Face API Token</label>
+                  <input id="huggingface_api_token" type="password" placeholder="Optional" />
+                </div>
+
+                <div class="two">
+                  <div class="setup-field">
+                    <label for="ai_detector_model">AI Detector Model</label>
+                    <input id="ai_detector_model" placeholder="noumenon-labs/Earlybird-fast" />
+                  </div>
+                  <div class="setup-field">
+                    <label for="deploy_token">Deploy Token</label>
+                    <input id="deploy_token" type="password" placeholder="Optional" />
+                  </div>
+                </div>
+              </section>
+
+              <section class="setup-section">
+                <div>
+                  <h2>First Admin Account</h2>
+                  <p>This account is created only when no admin exists yet. It becomes the first owner of the workspace and can invite managers and writers after sign-in.</p>
+                </div>
+
+                <div class="setup-field">
+                  <label for="admin_full_name">Admin Full Name</label>
+                  <input id="admin_full_name" placeholder="Operations Admin" />
+                </div>
+
+                <div class="two">
+                  <div class="setup-field">
+                    <label for="admin_email">Admin Email</label>
+                    <input id="admin_email" type="email" placeholder="admin@youragency.com" />
+                  </div>
+                  <div class="setup-field">
+                    <label for="admin_password">Admin Password</label>
+                    <input id="admin_password" type="password" placeholder="Choose a strong password" />
+                  </div>
+                </div>
+              </section>
+
+              <div class="setup-actions">
+                <button id="saveSetup" type="submit">Finish Setup</button>
+                <a href="/login.html" id="loginLink" class="hidden">Go to sign in</a>
+              </div>
+              <div class="muted setup-msg" id="setupMsg"></div>
+            </form>
+          </section>
+
+          <aside class="setup-card-stack">
+            <section class="card">
+              <p class="setup-kicker">Status</p>
+              <div class="setup-status-list">
+                <div class="setup-status-item">
+                  <div>
+                    <strong>Configuration File</strong>
+                    <span id="statusConfigCopy">Waiting for configuration details.</span>
+                  </div>
+                  <span class="badge" id="statusConfig">Pending</span>
+                </div>
+                <div class="setup-status-item">
+                  <div>
+                    <strong>Database Schema</strong>
+                    <span id="statusSchemaCopy">The required tables will be created automatically.</span>
+                  </div>
+                  <span class="badge" id="statusSchema">Pending</span>
+                </div>
+                <div class="setup-status-item">
+                  <div>
+                    <strong>Admin Account</strong>
+                    <span id="statusAdminCopy">Create the first admin to unlock the workspace.</span>
+                  </div>
+                  <span class="badge" id="statusAdmin">Pending</span>
+                </div>
+              </div>
+            </section>
+
+            <section class="card">
+              <p class="setup-kicker">Current Issues</p>
+              <div class="setup-issues" id="setupIssues">
+                <div>Loading setup status...</div>
+              </div>
+            </section>
+
+            <section class="card">
+              <p class="setup-kicker">What Happens Next</p>
+              <div class="setup-note">
+                After setup, managers can create projects, assign writers, review submitted articles, track payments, send project requests, and use the shared messaging system. AI and plagiarism checks remain optional and can be enabled per project.
+              </div>
+            </section>
+          </aside>
+        </div>
+      </main>
+    </div>
+
+    <script>
+      const fieldIds = [
+        "app_name",
+        "app_url",
+        "cors_origins",
+        "supabase_url",
+        "supabase_anon_key",
+        "supabase_service_role_key",
+        "database_url",
+        "db_host",
+        "db_port",
+        "db_user",
+        "db_password",
+        "db_name",
+        "db_ssl",
+        "huggingface_api_token",
+        "ai_detector_model",
+        "deploy_token",
+        "admin_full_name",
+        "admin_email",
+        "admin_password"
+      ];
+
+      function setMsg(text, isError) {
+        const el = document.getElementById("setupMsg");
+        el.textContent = text || "";
+        el.style.color = isError ? "var(--rw-danger)" : "var(--rw-muted)";
+      }
+
+      function setBusy(busy) {
+        document.getElementById("saveSetup").disabled = !!busy;
+        for (const id of fieldIds) {
+          const el = document.getElementById(id);
+          if (el) el.disabled = !!busy || el.dataset.locked === "true";
+        }
+      }
+
+      function badgeText(ok) {
+        return ok ? "Ready" : "Pending";
+      }
+
+      function badgeClass(ok) {
+        return ok ? "badge b-approved" : "badge b-rework";
+      }
+
+      function setBadge(id, ok) {
+        const el = document.getElementById(id);
+        el.className = badgeClass(ok);
+        el.textContent = badgeText(ok);
+      }
+
+      function lockForm(locked) {
+        for (const id of fieldIds) {
+          const el = document.getElementById(id);
+          if (!el) continue;
+          el.dataset.locked = locked ? "true" : "false";
+          el.disabled = locked;
+        }
+        document.getElementById("saveSetup").disabled = locked;
+        document.getElementById("loginLink").classList.toggle("hidden", !locked);
+      }
+
+      function renderIssues(issues) {
+        const host = document.getElementById("setupIssues");
+        if (!issues || !issues.length) {
+          host.innerHTML = `<div style="background:rgba(236,253,245,0.96);border-color:rgba(15,118,110,0.18);color:#12433f">No blockers detected. This workspace is ready for sign-in.</div>`;
+          return;
+        }
+        host.innerHTML = issues.map((issue) => `<div>${issue}</div>`).join("");
+      }
+
+      function applyStatus(state) {
+        document.title = `${state.app_name || "Real Write"} | First-Time Setup`;
+        setBadge("statusConfig", Boolean(state.supabase_configured && state.database_configured));
+        setBadge("statusSchema", Boolean(state.schema_ready));
+        setBadge("statusAdmin", Boolean(state.admin_exists));
+        document.getElementById("statusConfigCopy").textContent = state.runtime_config_file
+          ? `Using ${state.config_path}`
+          : "No runtime configuration file has been written yet.";
+        document.getElementById("statusSchemaCopy").textContent = state.schema_ready
+          ? "The required application tables are present."
+          : "The tables will be created the first time setup completes.";
+        document.getElementById("statusAdminCopy").textContent = state.admin_exists
+          ? "An admin account is already available for this workspace."
+          : "Create the first admin to unlock sign-in.";
+        renderIssues(state.issues || []);
+        lockForm(Boolean(state.ready));
+        if (state.ready) {
+          setMsg("Setup is complete. You can sign in now.", false);
+        }
+      }
+
+      function payloadFromForm() {
+        const out = {};
+        for (const id of fieldIds) {
+          out[id] = document.getElementById(id)?.value || "";
+        }
+        return out;
+      }
+
+      async function loadStatus() {
+        const res = await fetch("/api/setup/status", { cache: "no-store" });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body.error || "Could not load setup status.");
+        if (body.app_name && document.getElementById("app_name") && !document.getElementById("app_name").value) {
+          document.getElementById("app_name").value = body.app_name;
+        }
+        if (body.app_url && document.getElementById("app_url") && !document.getElementById("app_url").value) {
+          document.getElementById("app_url").value = body.app_url;
+        }
+        applyStatus(body);
+        return body;
+      }
+
+      async function finishSetup(event) {
+        event.preventDefault();
+        setMsg("", false);
+        setBusy(true);
+        try {
+          const res = await fetch("/api/setup/configure", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payloadFromForm())
+          });
+          const body = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(body.error || "Setup could not be completed.");
+          applyStatus(body.state || {});
+          setMsg(body.admin_created ? "Configuration saved and the admin account was created." : "Configuration saved.", false);
+          if (body.state?.ready) {
+            setTimeout(() => {
+              window.location.href = "/login.html";
+            }, 900);
+          }
+        } catch (error) {
+          setMsg(error.message || "Setup could not be completed.", true);
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      document.getElementById("setupForm").addEventListener("submit", finishSetup);
+      loadStatus().catch((error) => setMsg(error.message || "Could not load setup status.", true));
+    </script>
+  </body>
+</html>
