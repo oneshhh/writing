@@ -83,6 +83,17 @@ async function getAdminCount() {
   return Number(count || 0);
 }
 
+async function detectExistingWorkspace() {
+  const db = getSupabaseAdmin();
+  const { error } = await db.from("users").select("id", { head: true, count: "exact" }).limit(1);
+  if (error) throw new Error(error.message);
+  const adminCount = await getAdminCount();
+  return {
+    schemaReady: true,
+    adminExists: adminCount > 0
+  };
+}
+
 async function nextAdminUniqueId(db) {
   const { data, error } = await db.from("users").select("unique_id").eq("role", "admin").ilike("unique_id", "ADM-%");
   if (error) throw new Error(error.message);
@@ -278,9 +289,9 @@ async function computeSetupState() {
   let schemaReady = false;
   let adminExists = false;
   let storageReady = false;
+  let existingWorkspaceDetected = false;
 
   if (!supabaseConfigured) issues.push("Supabase credentials are missing.");
-  if (!databaseConfigured) issues.push("Database connection details are missing.");
 
   if (databaseConfigured) {
     try {
@@ -291,9 +302,27 @@ async function computeSetupState() {
     }
   }
 
+  if (supabaseConfigured && !schemaReady) {
+    try {
+      const detected = await detectExistingWorkspace();
+      schemaReady = detected.schemaReady;
+      adminExists = detected.adminExists;
+      existingWorkspaceDetected = detected.schemaReady;
+    } catch (error) {
+      if (!databaseConfigured) {
+        issues.push("Database connection details are missing.");
+        issues.push(error.message || "Could not inspect the existing workspace through Supabase.");
+      }
+    }
+  } else if (!databaseConfigured) {
+    issues.push("Database connection details are missing.");
+  }
+
   if (supabaseConfigured && schemaReady) {
     try {
-      adminExists = (await getAdminCount()) > 0;
+      if (!existingWorkspaceDetected) {
+        adminExists = (await getAdminCount()) > 0;
+      }
       if (!adminExists) issues.push("No admin account exists yet.");
     } catch (error) {
       issues.push(error.message || "Could not inspect application users.");
@@ -313,11 +342,12 @@ async function computeSetupState() {
     runtime_config_file: runtimeConfigFile,
     supabase_configured: supabaseConfigured,
     database_configured: databaseConfigured,
+    existing_workspace_detected: existingWorkspaceDetected,
     schema_ready: schemaReady,
     storage_ready: storageReady,
     admin_exists: adminExists,
-    ready: supabaseConfigured && databaseConfigured && schemaReady && adminExists,
-    setup_locked: supabaseConfigured && databaseConfigured && schemaReady && adminExists,
+    ready: supabaseConfigured && schemaReady && adminExists,
+    setup_locked: supabaseConfigured && schemaReady && adminExists,
     issues
   };
 }

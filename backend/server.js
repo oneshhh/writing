@@ -74,7 +74,7 @@ app.use(
 
 app.get("/", async (_req, res) => {
   try {
-    const state = await getSetupState();
+    const state = await ensureAppReady();
     return res.redirect(state.ready ? "/login.html" : "/setup.html");
   } catch {
     return res.redirect("/setup.html");
@@ -83,7 +83,7 @@ app.get("/", async (_req, res) => {
 
 app.get("/health", async (_req, res) => {
   try {
-    const state = await getSetupState();
+    const state = await ensureAppReady();
     return res.json({ ok: state.ready, setup: state });
   } catch (error) {
     return res.status(500).json({ ok: false, error: error.message || "Setup check failed" });
@@ -95,7 +95,7 @@ app.use("/api/setup", setupRoutes);
 app.use("/api", async (req, res, next) => {
   try {
     if (req.path.startsWith("/setup")) return next();
-    const state = await getSetupState();
+    const state = await ensureAppReady();
     if (state.ready) return next();
     return res.status(503).json({
       error: "The application setup is incomplete. Finish setup at /setup.html before using the API.",
