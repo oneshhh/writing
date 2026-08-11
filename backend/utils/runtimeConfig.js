@@ -23,7 +23,9 @@ const PERSISTED_KEYS = [
   "HUGGINGFACE_API_TOKEN",
   "HF_TOKEN",
   "AI_DETECTOR_MODEL",
-  "DEPLOY_TOKEN"
+  "DEPLOY_TOKEN",
+  "PAYMENT_PROOF_BUCKET",
+  "PAYMENT_PROOF_UPLOADS_ENABLED"
 ];
 
 function hasRuntimeConfigFile() {
@@ -78,5 +80,6 @@ module.exports = {
   hasRuntimeConfigFile,
   loadRuntimeConfigIntoEnv,
   readRuntimeConfig,
-  saveRuntimeConfig
+  saveRuntimeConfig,
+  sanitizePersistedConfig
 };

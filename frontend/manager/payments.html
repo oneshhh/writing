@@ -14,12 +14,19 @@
   <body>
     <div class="topbar" id="topbar"></div>
     <div class="wrap wide">
-      <div class="grid">
+      <main class="payments-page">
+        <section class="page-hero">
+          <div>
+            <h1>Payments</h1>
+            <p>Track pending balances, confirm completed payouts, and keep every project payment timeline in one place.</p>
+          </div>
+        </section>
+        <div class="grid">
         <div class="card">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
             <div>
-              <h2 style="margin:0">Payments</h2>
-              <div class="muted" style="margin-top:6px">Track pending and paid payments for your projects.</div>
+              <h2 style="margin:0">Workspace Links</h2>
+              <div class="muted" style="margin-top:6px">Jump back to your project list while you manage incoming and completed payouts.</div>
             </div>
             <div class="right" style="flex-wrap:wrap;">
               <a href="/manager/projects.html"><button class="secondary" type="button">Projects</button></a>
@@ -118,7 +125,8 @@
           </div>
           <div class="muted" id="msg" style="margin-top: 10px"></div>
         </div>
-      </div>
+        </div>
+      </main>
     </div>
 
     <dialog
@@ -132,8 +140,11 @@
         <input id="paymentId" />
       </div>
       <div style="margin-top:10px">
+        <div id="proofSection">
         <label class="muted">Proof file (optional)</label>
         <input id="proof" type="file" />
+        </div>
+        <div class="muted" id="proofHelp" style="margin-top:8px;display:none;">Payment proof uploads are disabled for this workspace right now.</div>
       </div>
       <div class="right" style="margin-top:12px">
         <button class="secondary" id="cancel">Cancel</button>
@@ -175,6 +186,7 @@
         let writerId = "";
         let selection = new Set();
         let modalPaymentIds = [];
+        let paymentProofUploadsActive = false;
 
         const money = (value) => `₹${Number(value || 0).toFixed(0)}`;
         const formatMonth = (month) => {
@@ -302,6 +314,8 @@
           modalPaymentIds = paymentIds.slice();
           document.getElementById("paymentId").value = "";
           document.getElementById("proof").value = "";
+          document.getElementById("proofSection").style.display = paymentProofUploadsActive ? "" : "none";
+          document.getElementById("proofHelp").style.display = paymentProofUploadsActive ? "none" : "block";
           document.getElementById("payModalTitle").textContent = modalPaymentIds.length > 1 ? "Mark selected paid" : "Mark paid";
           if (modalPaymentIds.length > 1) {
             document.getElementById("payFor").textContent = `${modalPaymentIds.length} payments selected`;
@@ -392,6 +406,13 @@
           await Promise.all([refreshStats(), refreshTrend(), loadPage()]);
         }
 
+        async function loadWorkspaceStatus() {
+          const res = await fetch("/api/setup/status", { cache: "no-store", credentials: "include" });
+          const body = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(body.error || "Could not inspect workspace settings.");
+          paymentProofUploadsActive = Boolean(body.payment_proof_uploads_active);
+        }
+
         async function loadProjects() {
           const out = await APP.apiFetch("/api/projects");
           const rows = out.projects || [];
@@ -441,7 +462,7 @@
           confirmPayButton.disabled = true;
           confirmPayButton.textContent = isBulk ? "Marking selected..." : "Marking paid...";
           APP.ui.beginLoading(isBulk ? "Marking selected payments..." : "Marking payment as paid...", {
-            sub: "Uploading proof and updating payment status",
+            sub: paymentProofUploadsActive ? "Uploading proof and updating payment status" : "Updating payment status",
             delayMs: 0
           });
           try {
@@ -534,6 +555,7 @@
         };
 
         try {
+          await loadWorkspaceStatus();
           await loadProjects();
           await loadWritersForProject("");
           setMonth(new Date());

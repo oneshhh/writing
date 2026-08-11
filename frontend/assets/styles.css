@@ -1275,6 +1275,37 @@ button.danger {
   grid-column: span 12;
 }
 
+.page-hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.page-hero h1 {
+  margin: 0 0 10px;
+  color: var(--rw-primary);
+  font-size: clamp(34px, 5vw, 54px);
+  line-height: 1.04;
+  letter-spacing: -0.045em;
+  font-weight: 900;
+}
+
+.page-hero p {
+  margin: 0;
+  max-width: 640px;
+  color: var(--rw-muted);
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.review-page,
+.payments-page {
+  display: grid;
+  gap: 24px;
+}
+
 .review-page-head {
   display: flex;
   align-items: flex-start;
@@ -1344,6 +1375,18 @@ button.danger {
   font-weight: 820;
   letter-spacing: -0.035em;
   overflow-wrap: anywhere;
+}
+
+.review-byline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  color: var(--rw-muted);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .review-short {
@@ -1582,16 +1625,19 @@ button.danger {
 
 .projects-search .material-symbols-outlined {
   position: absolute;
-  left: 14px;
+  left: 16px;
   top: 50%;
   transform: translateY(-50%);
   color: var(--rw-muted);
-  font-size: 19px;
+  font-size: 18px;
   pointer-events: none;
+  z-index: 1;
+  line-height: 1;
 }
 
 .projects-search input {
-  padding-left: 44px;
+  width: 100%;
+  padding-left: 52px;
 }
 
 .projects-selected {
@@ -2269,16 +2315,19 @@ button.planner-day {
 
 .chat-search-wrap .material-symbols-outlined {
   position: absolute;
-  left: 18px;
+  left: 16px;
   top: 50%;
   transform: translateY(-50%);
   color: var(--rw-muted);
-  font-size: 20px;
+  font-size: 18px;
   pointer-events: none;
+  z-index: 1;
+  line-height: 1;
 }
 
 .chat-search-wrap input {
-  padding-left: 56px;
+  width: 100%;
+  padding-left: 52px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.88);
   box-shadow: none;

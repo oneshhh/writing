@@ -13,8 +13,15 @@
   </head>
   <body>
     <div class="topbar" id="topbar"></div>
-    <div class="wrap wide review-page">
-      <div class="grid">
+    <div class="wrap wide">
+      <main class="review-page">
+        <section class="page-hero">
+          <div>
+            <h1>Review Queue</h1>
+            <p>Open submitted drafts, run screening checks, and send each article forward with clean editorial feedback.</p>
+          </div>
+        </section>
+        <div class="grid">
         <div class="card review-queue-card" id="queueCard">
           <div class="review-page-head">
             <div>
@@ -38,9 +45,9 @@
           <div class="review-article-head">
             <div class="review-title-block">
               <div class="badge" id="status"></div>
+              <div class="review-byline hidden" id="writerMeta"></div>
               <h1 id="title"></h1>
               <div class="muted review-short" id="short"></div>
-              <div class="muted review-short hidden" id="writerMeta"></div>
               <div class="muted review-short hidden" id="requestMeta"></div>
             </div>
             <div class="review-score-row">
@@ -87,7 +94,8 @@
           </div>
           <div class="muted" id="msg" style="margin-top: 10px"></div>
         </div>
-      </div>
+        </div>
+      </main>
     </div>
     <script>
       (async function () {

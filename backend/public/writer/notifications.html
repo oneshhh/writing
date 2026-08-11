@@ -1,0 +1,121 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/png" href="/assets/realwrite-logo.png" />
+    <link rel="apple-touch-icon" href="/assets/realwrite-logo.png" />
+    <title>Real Write • Writer • Notifications</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+    <script src="/shared/config.js"></script>
+    <script src="/shared/app.js"></script>
+    <script src="/shared/topbar.js"></script>
+  </head>
+  <body>
+    <div class="topbar" id="topbar"></div>
+    <div class="wrap">
+      <div class="grid">
+        <div class="card">
+          <h2>Inbox</h2>
+          <table>
+            <thead><tr><th>Title</th><th>Body</th><th>When</th><th></th><th></th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <script>
+      (async function () {
+        const user = await APP.requireRole("writer");
+        if (!user) return;
+        await renderTopbar({ role: user.role, links: [{ href: `/${user.role}/dashboard.html`, label: "Dashboard" }] });
+        let lastSignature = "";
+        let lastUnread = null;
+
+        function notificationHref(n) {
+          const articleId = n?.payload?.article_id;
+          const paymentId = n?.payload?.payment_id;
+          const requestId = n?.payload?.request_id;
+          const projectId = n?.payload?.project_id;
+          if (String(n?.type || "").startsWith("payment")) {
+            return user.role === "writer" ? `/writer/earnings.html?payment=${encodeURIComponent(paymentId || "")}` : null;
+          }
+          if (String(n?.type || "").startsWith("article_") && articleId) {
+            return user.role === "writer" ? `/writer/dashboard.html?article=${encodeURIComponent(articleId)}` : null;
+          }
+          if (n?.type === "project_request" && requestId) {
+            return user.role === "writer" ? `/writer/dashboard.html?request=${encodeURIComponent(requestId)}` : null;
+          }
+          if (n?.type === "project_request_response" && requestId && projectId) {
+            return user.role === "manager"
+              ? `/manager/project-detail.html?id=${encodeURIComponent(projectId)}&request=${encodeURIComponent(requestId)}`
+              : null;
+          }
+          if (n?.type === "project_request_submission" && articleId) {
+            return user.role === "manager" ? `/manager/review.html?id=${encodeURIComponent(articleId)}` : null;
+          }
+          return null;
+        }
+
+        async function markRead(id) {
+          await APP.apiFetch(`/api/notifications/${encodeURIComponent(id)}/read`, { method: "PATCH" });
+        }
+
+        function renderRows(notifications) {
+          document.getElementById("rows").innerHTML = (notifications || [])
+            .map((n) => {
+              const href = notificationHref(n);
+              return `<tr>
+              <td>${n.read ? "<span class='badge b-draft'>read</span>" : "<span class='badge b-submitted'>new</span>"} ${APP.escapeHtml(n.title)}</td>
+              <td class="muted">${APP.escapeHtml(n.body)}</td>
+              <td class="muted">${APP.escapeHtml(new Date(n.created_at).toLocaleString())}</td>
+              <td class="right">${href ? `<a href="${href}" data-open="${n.id}" data-href="${href}"><button type="button">Open</button></a>` : ""}</td>
+              <td class="right">${n.read ? "" : `<button class="secondary" data-read="${n.id}">Mark read</button>`}</td>
+            </tr>`;
+            })
+            .join("");
+          for (const b of document.querySelectorAll("button[data-read]")) {
+            b.onclick = async () => {
+              await markRead(b.getAttribute("data-read"));
+              await refresh();
+            };
+          }
+          for (const link of document.querySelectorAll("a[data-open]")) {
+            link.onclick = async (event) => {
+              event.preventDefault();
+              const href = link.getAttribute("data-href");
+              try {
+                await markRead(link.getAttribute("data-open"));
+              } catch (_err) {}
+              if (href) window.location.href = href;
+            };
+          }
+        }
+
+        async function refresh(silent) {
+          if (!silent) APP.ui.tableSkeleton("rows", { rows: 10, cols: 5 });
+          const data = await APP.apiFetch("/api/notifications");
+          const notifications = data.notifications || [];
+          const signature = notifications.map((n) => `${n.id}:${n.read ? 1 : 0}`).join("|");
+          const unread = notifications.filter((n) => !n.read).length;
+          if (signature !== lastSignature) {
+            renderRows(notifications);
+          }
+          if (silent && lastUnread != null && unread > lastUnread) {
+            APP.ui?.toast?.(`${unread - lastUnread} new notification${unread - lastUnread === 1 ? "" : "s"}`, {
+              kind: "success",
+              ttlMs: 3200
+            });
+          }
+          lastSignature = signature;
+          lastUnread = unread;
+        }
+        await refresh();
+        if (window.__rwNotificationsPagePoll) clearInterval(window.__rwNotificationsPagePoll);
+        window.__rwNotificationsPagePoll = setInterval(() => {
+          refresh(true).catch(() => {});
+        }, 3000);
+      })();
+    </script>
+  </body>
+</html>

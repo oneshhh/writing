@@ -45,7 +45,8 @@ async function renderTopbar({ role, links }) {
       { href: "/admin/dashboard.html", label: "Dashboard", icon: "dashboard" },
       { href: "/admin/users.html", label: "Users", icon: "groups" },
       { href: "/admin/projects.html", label: "Projects", icon: "folder_copy" },
-      { href: "/admin/payments.html", label: "Payments", icon: "payments" }
+      { href: "/admin/payments.html", label: "Payments", icon: "payments" },
+      { href: "/admin/settings.html", label: "Settings", icon: "settings" }
     ],
     manager: [
       { href: "/manager/dashboard.html", label: "Dashboard", icon: "dashboard" },
@@ -87,8 +88,12 @@ async function renderTopbar({ role, links }) {
     .map((p) => p.trim())
     .filter(Boolean);
   const pageTitle = titleParts.length ? titleParts[titleParts.length - 1] : rawTitle;
+  const roleTitle = role ? `${String(role).charAt(0).toUpperCase()}${String(role).slice(1)} ` : "";
+  const headerTitle =
+    titleParts.length > 1 && pageTitle ? `${appName} - ${roleTitle}${pageTitle}`.trim() : pageTitle || "Dashboard";
+  const notificationsHref = role ? `/${encodeURIComponent(role)}/notifications.html` : "/shared/notifications.html";
   const navLinks = mergeLinks(standardLinksByRole[role] || [], links || []);
-  navLinks.push({ href: "/shared/notifications.html", label: "Notifications", icon: "notifications" });
+  navLinks.push({ href: notificationsHref, label: "Notifications", icon: "notifications" });
   navLinks.push({ href: "/profile.html", label: "Profile", icon: "account_circle" });
 
   const pathname = String(window.location.pathname || "");
@@ -121,7 +126,7 @@ async function renderTopbar({ role, links }) {
             <span class="material-symbols-outlined" aria-hidden="true">${l.icon}</span>
             <span>${APP.escapeHtml(l.label)}</span>
             ${l.href === `/${role}/messages.html` ? `<span class="rw-nav-pill hidden" id="rwMessageCount"></span>` : ""}
-            ${l.href === "/shared/notifications.html" ? `<span class="rw-nav-pill hidden" id="rwNotificationCount"></span>` : ""}
+            ${l.href === notificationsHref ? `<span class="rw-nav-pill hidden" id="rwNotificationCount"></span>` : ""}
           </a>
         `
           )
@@ -149,7 +154,7 @@ async function renderTopbar({ role, links }) {
         <button class="rw-icon-btn rw-menu-btn" id="rwMenuBtn" type="button" aria-label="Menu">
           <span class="material-symbols-outlined" aria-hidden="true">menu</span>
         </button>
-        <div class="rw-header-title" title="${APP.escapeHtml(pageTitle)}">${APP.escapeHtml(pageTitle || "Dashboard")}</div>
+        <div class="rw-header-title" title="${APP.escapeHtml(headerTitle)}">${APP.escapeHtml(headerTitle)}</div>
       </div>
       <div class="rw-header-actions"></div>
     </header>
@@ -203,7 +208,7 @@ async function renderTopbar({ role, links }) {
         .then((data) => {
           const unread = Number(data.unread || 0);
           updatePill(unreadBadge, unread, "#c45a2b");
-          if (lastUnread != null && unread > lastUnread && window.location.pathname !== "/shared/notifications.html") {
+          if (lastUnread != null && unread > lastUnread && !String(window.location.pathname || "").endsWith("/notifications.html")) {
             APP.ui?.toast?.(`${unread - lastUnread} new notification${unread - lastUnread === 1 ? "" : "s"}`, {
               kind: "success",
               ttlMs: 3200

@@ -307,6 +307,19 @@
                     <input id="deploy_token" type="password" placeholder="Optional" />
                   </div>
                 </div>
+
+                <div class="setup-field">
+                  <label for="payment_proof_bucket">Payment Proof Bucket</label>
+                  <input id="payment_proof_bucket" placeholder="payment-proofs" />
+                </div>
+
+                <label class="setup-note" for="payment_proof_uploads_enabled" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                  <span>
+                    <strong style="display:block;color:var(--rw-text);margin-bottom:4px;">Enable payment proof uploads</strong>
+                    Managers will only be able to upload proof files if this option is enabled and the bucket actually exists.
+                  </span>
+                  <input id="payment_proof_uploads_enabled" type="checkbox" style="width:20px;height:20px;" />
+                </label>
               </section>
 
               <section class="setup-section">
@@ -404,6 +417,7 @@
         "huggingface_api_token",
         "ai_detector_model",
         "deploy_token",
+        "payment_proof_bucket",
         "admin_full_name",
         "admin_email",
         "admin_password"
@@ -421,6 +435,8 @@
           const el = document.getElementById(id);
           if (el) el.disabled = !!busy || el.dataset.locked === "true";
         }
+        const proofToggle = document.getElementById("payment_proof_uploads_enabled");
+        if (proofToggle) proofToggle.disabled = !!busy || proofToggle.dataset.locked === "true";
       }
 
       function badgeText(ok) {
@@ -443,6 +459,11 @@
           if (!el) continue;
           el.dataset.locked = locked ? "true" : "false";
           el.disabled = locked;
+        }
+        const proofToggle = document.getElementById("payment_proof_uploads_enabled");
+        if (proofToggle) {
+          proofToggle.dataset.locked = locked ? "true" : "false";
+          proofToggle.disabled = locked;
         }
         document.getElementById("saveSetup").disabled = locked;
         document.getElementById("loginLink").classList.toggle("hidden", !locked);
@@ -483,6 +504,7 @@
         for (const id of fieldIds) {
           out[id] = document.getElementById(id)?.value || "";
         }
+        out.payment_proof_uploads_enabled = document.getElementById("payment_proof_uploads_enabled")?.checked || false;
         return out;
       }
 
@@ -495,6 +517,12 @@
         }
         if (body.app_url && document.getElementById("app_url") && !document.getElementById("app_url").value) {
           document.getElementById("app_url").value = body.app_url;
+        }
+        if (body.payment_proof_bucket && document.getElementById("payment_proof_bucket") && !document.getElementById("payment_proof_bucket").value) {
+          document.getElementById("payment_proof_bucket").value = body.payment_proof_bucket;
+        }
+        if (document.getElementById("payment_proof_uploads_enabled")) {
+          document.getElementById("payment_proof_uploads_enabled").checked = Boolean(body.payment_proof_uploads_enabled);
         }
         applyStatus(body);
         return body;

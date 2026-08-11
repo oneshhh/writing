@@ -1,6 +1,7 @@
 const express = require("express");
 const multer = require("multer");
 const { authorizeRoles } = require("../middleware/authorize");
+const { getSetupState } = require("../services/appSetup");
 const { getSupabaseAdmin } = require("../utils/supabase");
 const { notifyWriter } = require("../services/writerNotifications");
 const { getManagerProjectIds, requireManagerProjectAccess } = require("../utils/projectAccess");
@@ -72,7 +73,13 @@ function summarizeMonthlyPayments(rows, monthKeys) {
 
 async function uploadProofFile(db, payment, file) {
   if (!file) return payment.proof_url || null;
-  const bucket = "payment-proofs";
+  const setupState = await getSetupState();
+  if (!setupState.payment_proof_uploads_active) {
+    const error = new Error("Payment proof uploads are disabled because the proof bucket is not enabled for this workspace.");
+    error.status = 400;
+    throw error;
+  }
+  const bucket = setupState.payment_proof_bucket || "payment-proofs";
   const targetKey = payment.article_id || payment.request_id || payment.id;
   const path = `${payment.writer_id}/${targetKey}/${Date.now()}_${file.originalname}`;
   const { error: upErr } = await db.storage.from(bucket).upload(path, file.buffer, {
@@ -407,6 +414,22 @@ router.patch("/:id/pay", authorizeRoles("manager", "admin"), upload.single("proo
       paymentId: payment_id || null,
       proofUrl
     });
+    return res.json({ payment: updated });
+  } catch (e) {
+    return res.status(e.status || 400).json({ error: e.message || String(e) });
+  }
+});
+
+router.patch("/:id/proof", authorizeRoles("admin"), upload.single("proof"), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "A proof file is required." });
+  const db = getSupabaseAdmin();
+  const { data: payment, error: getErr } = await db.from("payments").select("*").eq("id", req.params.id).single();
+  if (getErr) return res.status(400).json({ error: getErr.message });
+
+  try {
+    const proofUrl = await uploadProofFile(db, payment, req.file);
+    const { data: updated, error } = await db.from("payments").update({ proof_url: proofUrl }).eq("id", payment.id).select("*").single();
+    if (error) throw new Error(error.message);
     return res.json({ payment: updated });
   } catch (e) {
     return res.status(e.status || 400).json({ error: e.message || String(e) });

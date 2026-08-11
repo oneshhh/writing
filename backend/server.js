@@ -10,6 +10,7 @@ const { ensureAppReady, getSetupState } = require("./services/appSetup");
 
 const authRoutes = require("./routes/auth");
 const setupRoutes = require("./routes/setup");
+const adminSettingsRoutes = require("./routes/adminSettings");
 const usersRoutes = require("./routes/users");
 const projectsRoutes = require("./routes/projects");
 const articlesRoutes = require("./routes/articles");
@@ -107,6 +108,7 @@ app.use("/api", async (req, res, next) => {
 });
 
 app.use("/api/auth", authenticate.optional, authRoutes);
+app.use("/api/admin/settings", authenticate.required, adminSettingsRoutes);
 app.use("/api/users", authenticate.required, usersRoutes);
 app.use("/api/projects", authenticate.required, projectsRoutes);
 app.use("/api/articles", authenticate.required, articlesRoutes);

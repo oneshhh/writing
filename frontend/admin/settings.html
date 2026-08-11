@@ -1,0 +1,383 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/png" href="/assets/realwrite-logo.png" />
+    <link rel="apple-touch-icon" href="/assets/realwrite-logo.png" />
+    <title>Real Write • Admin • Settings</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+    <script src="/shared/config.js"></script>
+    <script src="/shared/app.js"></script>
+    <script src="/shared/topbar.js"></script>
+    <style>
+      .settings-shell { display: grid; gap: 18px; }
+      .settings-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.85fr); gap: 18px; align-items: start; }
+      .settings-stack { display: grid; gap: 18px; }
+      .settings-section { display: grid; gap: 12px; padding: 18px; border: 1px solid rgba(229, 226, 225, 0.95); border-radius: 20px; background: rgba(255,255,255,0.72); }
+      .settings-section h2 { margin: 0; }
+      .settings-section p { margin: 0; }
+      .settings-note { padding: 14px 16px; border-radius: 16px; border: 1px solid rgba(193,200,195,0.85); background: rgba(246,243,242,0.82); }
+      .settings-note code { word-break: break-all; }
+      .settings-field { display: grid; gap: 8px; }
+      .settings-field label { color: var(--rw-muted); font-size: 11px; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; }
+      .settings-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
+      .settings-status-grid { display: grid; gap: 12px; }
+      .settings-status-item { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 14px 16px; border: 1px solid rgba(229, 226, 225, 0.95); border-radius: 16px; background: rgba(255,255,255,0.8); }
+      .settings-secret { color: var(--rw-muted); font-size: 12px; }
+      .settings-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-radius: 16px; background: rgba(246,243,242,0.7); border: 1px solid rgba(229,226,225,0.95); }
+      .settings-toggle input { width: 20px; height: 20px; }
+      @media (max-width: 980px) { .settings-grid { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <div class="topbar" id="topbar"></div>
+    <div class="wrap wide">
+      <main class="settings-shell">
+        <section class="card">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+            <div>
+              <h1 style="margin:0">Workspace Settings</h1>
+              <div class="muted" style="margin-top:6px">
+                Review the same deployment and integration values used during setup. Blank secret fields keep the current saved value.
+              </div>
+            </div>
+            <div class="right" style="flex-wrap:wrap;">
+              <a href="/admin/payments.html"><button class="secondary" type="button">Payments</button></a>
+              <a href="/admin/projects.html"><button class="secondary" type="button">Projects</button></a>
+            </div>
+          </div>
+        </section>
+
+        <div class="settings-grid">
+          <section class="card">
+            <form id="settingsForm" style="display:grid;gap:18px;">
+              <section class="settings-section">
+                <div>
+                  <h2>Workspace</h2>
+                  <p class="muted">Branding and public-origin values used by the app shell and browser requests.</p>
+                </div>
+                <div class="two">
+                  <div class="settings-field">
+                    <label for="app_name">Application Name</label>
+                    <input id="app_name" />
+                  </div>
+                  <div class="settings-field">
+                    <label for="app_url">Public App URL</label>
+                    <input id="app_url" />
+                  </div>
+                </div>
+                <div class="settings-field">
+                  <label for="cors_origins">CORS Origins</label>
+                  <input id="cors_origins" />
+                </div>
+              </section>
+
+              <section class="settings-section">
+                <div>
+                  <h2>Supabase</h2>
+                  <p class="muted">These fields mirror your original setup values. Leave secret fields blank to keep the current value.</p>
+                </div>
+                <div class="settings-field">
+                  <label for="supabase_url">Supabase URL</label>
+                  <input id="supabase_url" />
+                </div>
+                <div class="two">
+                  <div class="settings-field">
+                    <label for="supabase_anon_key">Supabase Anon Key</label>
+                    <textarea id="supabase_anon_key" placeholder="Leave blank to keep current key"></textarea>
+                    <div class="settings-secret" id="secret_supabase_anon_key"></div>
+                  </div>
+                  <div class="settings-field">
+                    <label for="supabase_service_role_key">Supabase Service Role Key</label>
+                    <textarea id="supabase_service_role_key" placeholder="Leave blank to keep current key"></textarea>
+                    <div class="settings-secret" id="secret_supabase_service_role_key"></div>
+                  </div>
+                </div>
+                <div class="settings-field">
+                  <label for="supabase_jwt_aud">Supabase JWT Audience</label>
+                  <input id="supabase_jwt_aud" />
+                </div>
+              </section>
+
+              <section class="settings-section">
+                <div>
+                  <h2>Database</h2>
+                  <p class="muted">Use either the direct connection string or the split host/port credentials.</p>
+                </div>
+                <div class="settings-field">
+                  <label for="database_url">Database URL</label>
+                  <input id="database_url" />
+                </div>
+                <div class="two">
+                  <div class="settings-field">
+                    <label for="db_host">DB Host</label>
+                    <input id="db_host" />
+                  </div>
+                  <div class="settings-field">
+                    <label for="db_port">DB Port</label>
+                    <input id="db_port" />
+                  </div>
+                </div>
+                <div class="two">
+                  <div class="settings-field">
+                    <label for="db_user">DB User</label>
+                    <input id="db_user" />
+                  </div>
+                  <div class="settings-field">
+                    <label for="db_password">DB Password</label>
+                    <input id="db_password" type="password" placeholder="Leave blank to keep current password" />
+                    <div class="settings-secret" id="secret_db_password"></div>
+                  </div>
+                </div>
+                <div class="two">
+                  <div class="settings-field">
+                    <label for="db_name">DB Name</label>
+                    <input id="db_name" />
+                  </div>
+                  <div class="settings-field">
+                    <label for="db_ssl">DB SSL</label>
+                    <select id="db_ssl">
+                      <option value="">Auto</option>
+                      <option value="false">Disabled</option>
+                      <option value="true">Required</option>
+                    </select>
+                  </div>
+                </div>
+              </section>
+
+              <section class="settings-section">
+                <div>
+                  <h2>Optional Integrations</h2>
+                  <p class="muted">These are optional and can be updated later without changing the rest of the workspace.</p>
+                </div>
+                <div class="two">
+                  <div class="settings-field">
+                    <label for="huggingface_api_token">Hugging Face API Token</label>
+                    <input id="huggingface_api_token" type="password" placeholder="Leave blank to keep current token" />
+                    <div class="settings-secret" id="secret_huggingface_api_token"></div>
+                  </div>
+                  <div class="settings-field">
+                    <label for="ai_detector_model">AI Detector Model</label>
+                    <input id="ai_detector_model" />
+                  </div>
+                </div>
+                <div class="settings-field">
+                  <label for="deploy_token">Deploy Token</label>
+                  <input id="deploy_token" type="password" placeholder="Leave blank to keep current token" />
+                  <div class="settings-secret" id="secret_deploy_token"></div>
+                </div>
+              </section>
+
+              <section class="settings-section">
+                <div>
+                  <h2>Payment Proof Uploads</h2>
+                  <p class="muted">Proof uploads are optional. Managers only see the upload field when this feature is enabled and the bucket exists.</p>
+                </div>
+                <div class="settings-field">
+                  <label for="payment_proof_bucket">Proof Bucket Name</label>
+                  <input id="payment_proof_bucket" />
+                </div>
+                <label class="settings-toggle" for="payment_proof_uploads_enabled">
+                  <span>
+                    <strong style="display:block">Enable Payment Proof Uploads</strong>
+                    <span class="muted">The app only activates uploads when the configured bucket actually exists.</span>
+                  </span>
+                  <input id="payment_proof_uploads_enabled" type="checkbox" />
+                </label>
+                <div class="settings-actions" style="justify-content:flex-start;">
+                  <button class="secondary" id="createProofBucket" type="button">Create Proof Bucket</button>
+                </div>
+              </section>
+
+              <div class="settings-actions">
+                <button class="secondary" id="reloadSettings" type="button">Reload</button>
+                <button id="saveSettings" type="submit">Save Settings</button>
+              </div>
+              <div class="muted" id="settingsMsg"></div>
+            </form>
+          </section>
+
+          <aside class="settings-stack">
+            <section class="card">
+              <h2 style="margin-top:0">Current Status</h2>
+              <div class="settings-status-grid" id="settingsStatus"></div>
+            </section>
+
+            <section class="card">
+              <h2 style="margin-top:0">Persistence</h2>
+              <div class="settings-note">
+                These settings are currently saved in the server runtime configuration file and environment context, not in the workspace database.
+                <br /><br />
+                <strong>Config path</strong><br />
+                <code id="configPath">Loading…</code>
+              </div>
+            </section>
+          </aside>
+        </div>
+      </main>
+    </div>
+
+    <script>
+      (async function () {
+        const user = await APP.requireRole("admin");
+        if (!user) return;
+        await renderTopbar({ role: user.role });
+
+        const fieldMap = {
+          app_name: "APP_NAME",
+          app_url: "APP_URL",
+          cors_origins: "CORS_ORIGINS",
+          supabase_url: "SUPABASE_URL",
+          supabase_anon_key: "SUPABASE_ANON_KEY",
+          supabase_service_role_key: "SUPABASE_SERVICE_ROLE_KEY",
+          supabase_jwt_aud: "SUPABASE_JWT_AUD",
+          database_url: "DATABASE_URL",
+          db_host: "DB_HOST",
+          db_port: "DB_PORT",
+          db_user: "DB_USER",
+          db_password: "DB_PASSWORD",
+          db_name: "DB_NAME",
+          db_ssl: "DB_SSL",
+          huggingface_api_token: "HUGGINGFACE_API_TOKEN",
+          ai_detector_model: "AI_DETECTOR_MODEL",
+          deploy_token: "DEPLOY_TOKEN",
+          payment_proof_bucket: "PAYMENT_PROOF_BUCKET"
+        };
+
+        function setMsg(text, isError) {
+          const el = document.getElementById("settingsMsg");
+          el.textContent = text || "";
+          el.style.color = isError ? "var(--rw-danger)" : "var(--rw-muted)";
+        }
+
+        function setBusy(busy) {
+          document.getElementById("saveSettings").disabled = !!busy;
+          document.getElementById("reloadSettings").disabled = !!busy;
+          document.getElementById("createProofBucket").disabled = !!busy;
+          for (const id of Object.keys(fieldMap)) {
+            const el = document.getElementById(id);
+            if (el) el.disabled = !!busy;
+          }
+          document.getElementById("payment_proof_uploads_enabled").disabled = !!busy;
+        }
+
+        function badge(ok) {
+          return ok ? `<span class="badge b-approved">Ready</span>` : `<span class="badge b-rework">Pending</span>`;
+        }
+
+        function renderStatus(state) {
+          document.getElementById("configPath").textContent = state.config_path || "Not available";
+          document.getElementById("settingsStatus").innerHTML = `
+            <div class="settings-status-item">
+              <div>
+                <strong>Workspace Setup</strong>
+                <div class="muted">${APP.escapeHtml(state.ready ? "The workspace is ready." : "The workspace still has unresolved setup items.")}</div>
+              </div>
+              ${badge(Boolean(state.ready))}
+            </div>
+            <div class="settings-status-item">
+              <div>
+                <strong>Database Schema</strong>
+                <div class="muted">${APP.escapeHtml(state.schema_ready ? "Core tables are available." : "Schema bootstrap still needs attention.")}</div>
+              </div>
+              ${badge(Boolean(state.schema_ready))}
+            </div>
+            <div class="settings-status-item">
+              <div>
+                <strong>Payment Proof Bucket</strong>
+                <div class="muted">${APP.escapeHtml(state.payment_proof_bucket || "payment-proofs")} • ${APP.escapeHtml(state.payment_proof_bucket_exists ? "Bucket found" : "Bucket missing")}</div>
+              </div>
+              ${badge(Boolean(state.payment_proof_bucket_exists))}
+            </div>
+            <div class="settings-status-item">
+              <div>
+                <strong>Proof Upload Feature</strong>
+                <div class="muted">${APP.escapeHtml(state.payment_proof_uploads_active ? "Managers can upload proof files." : "Proof uploads are currently disabled.")}</div>
+              </div>
+              ${badge(Boolean(state.payment_proof_uploads_active))}
+            </div>
+          `;
+        }
+
+        function applyPayload(payload) {
+          const config = payload.config || {};
+          const secrets = payload.secrets || {};
+          const state = payload.state || {};
+
+          for (const [id, key] of Object.entries(fieldMap)) {
+            const el = document.getElementById(id);
+            if (!el) continue;
+            el.value = config[key] || "";
+          }
+          document.getElementById("payment_proof_uploads_enabled").checked = Boolean(state.payment_proof_uploads_enabled);
+
+          for (const [key, info] of Object.entries(secrets)) {
+            const host = document.getElementById(`secret_${key.toLowerCase()}`);
+            if (!host) continue;
+            host.textContent = info?.configured ? `Current value saved: ${info.masked || "Configured"}` : "No saved value yet.";
+          }
+
+          renderStatus(state);
+        }
+
+        function buildBody() {
+          const body = {};
+          for (const [id] of Object.entries(fieldMap)) {
+            body[id] = document.getElementById(id).value;
+          }
+          body.payment_proof_uploads_enabled = document.getElementById("payment_proof_uploads_enabled").checked;
+          return body;
+        }
+
+        async function loadSettings() {
+          const payload = await APP.apiFetch("/api/admin/settings", { skipLoader: true });
+          applyPayload(payload);
+          return payload;
+        }
+
+        async function saveSettings(event) {
+          event.preventDefault();
+          setMsg("", false);
+          setBusy(true);
+          try {
+            const payload = await APP.apiFetch("/api/admin/settings", {
+              method: "PATCH",
+              body: JSON.stringify(buildBody())
+            });
+            applyPayload(payload);
+            setMsg(payload.state?.payment_proof_uploads_active ? "Settings saved." : "Settings saved. Payment proof uploads will stay off until the bucket exists.", false);
+          } catch (error) {
+            setMsg(error.message || "Could not save settings.", true);
+          } finally {
+            setBusy(false);
+          }
+        }
+
+        async function createProofBucket() {
+          setMsg("", false);
+          setBusy(true);
+          try {
+            const payload = await APP.apiFetch("/api/admin/settings/payment-proof-bucket", { method: "POST" });
+            renderStatus(payload.state || {});
+            setMsg(payload.created ? "Payment proof bucket created." : "Payment proof bucket already exists.", false);
+          } catch (error) {
+            setMsg(error.message || "Could not create the payment proof bucket.", true);
+          } finally {
+            setBusy(false);
+          }
+        }
+
+        document.getElementById("settingsForm").addEventListener("submit", saveSettings);
+        document.getElementById("reloadSettings").onclick = () => loadSettings().catch((error) => setMsg(error.message || "Could not reload settings.", true));
+        document.getElementById("createProofBucket").onclick = createProofBucket;
+
+        try {
+          await loadSettings();
+        } catch (error) {
+          setMsg(error.message || "Could not load settings.", true);
+        }
+      })();
+    </script>
+  </body>
+</html>

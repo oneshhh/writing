@@ -44,7 +44,7 @@ router.post("/configure", async (req, res) => {
 router.post("/bootstrap-admin", async (req, res) => {
   try {
     const state = await getSetupState({ refresh: true });
-    if (!state.supabase_configured || !state.database_configured || !state.schema_ready) {
+    if (!state.supabase_configured || !state.schema_ready) {
       return res.status(400).json({ error: "Configure the deployment and create the schema before creating an admin." });
     }
     if (state.admin_exists) {

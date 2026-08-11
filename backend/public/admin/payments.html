@@ -134,14 +134,34 @@
         <input id="paymentId" />
       </div>
       <div style="margin-top:10px">
+        <div id="proofSection">
         <label class="muted">Proof file (optional)</label>
         <input id="proof" type="file" />
+        </div>
+        <div class="muted" id="proofHelp" style="margin-top:8px;display:none;">Payment proof uploads are disabled for this workspace right now.</div>
       </div>
       <div class="right" style="margin-top:12px">
         <button class="secondary" id="cancel">Cancel</button>
         <button id="confirm">Mark paid</button>
       </div>
       <div class="muted" id="modalMsg" style="margin-top:10px"></div>
+    </dialog>
+
+    <dialog
+      id="proofModal"
+      style="border:1px solid rgba(229,226,225,0.95);border-radius:24px;background:rgba(255,255,255,0.9);color:var(--rw-text);padding:16px;max-width:520px;width:95%;box-shadow:var(--rw-shadow)"
+    >
+      <h3 style="margin:0 0 10px 0">Add payment proof</h3>
+      <div class="muted" id="proofFor"></div>
+      <div style="margin-top:10px">
+        <label class="muted">Proof file</label>
+        <input id="proofOnly" type="file" />
+      </div>
+      <div class="right" style="margin-top:12px">
+        <button class="secondary" id="proofCancel">Cancel</button>
+        <button id="proofConfirm">Save proof</button>
+      </div>
+      <div class="muted" id="proofModalMsg" style="margin-top:10px"></div>
     </dialog>
 
     <script>
@@ -161,7 +181,10 @@
         const msg = (t) => (document.getElementById("msg").textContent = t || "");
         const modal = document.getElementById("payModal");
         const modalMsg = (t) => (document.getElementById("modalMsg").textContent = t || "");
+        const proofModal = document.getElementById("proofModal");
+        const proofModalMsg = (t) => (document.getElementById("proofModalMsg").textContent = t || "");
         document.getElementById("cancel").onclick = () => modal.close();
+        document.getElementById("proofCancel").onclick = () => proofModal.close();
 
         APP.ui.textSkeleton("nPaid", { kind: "num", width: "54%" });
         APP.ui.textSkeleton("nPending", { kind: "num", width: "54%" });
@@ -177,6 +200,8 @@
         let writerId = "";
         let selection = new Set();
         let modalPaymentIds = [];
+        let proofModalPaymentId = "";
+        let paymentProofUploadsActive = false;
 
         const money = (value) => `₹${Number(value || 0).toFixed(0)}`;
         const formatMonth = (month) => {
@@ -304,6 +329,8 @@
           modalPaymentIds = paymentIds.slice();
           document.getElementById("paymentId").value = "";
           document.getElementById("proof").value = "";
+          document.getElementById("proofSection").style.display = paymentProofUploadsActive ? "" : "none";
+          document.getElementById("proofHelp").style.display = paymentProofUploadsActive ? "none" : "block";
           document.getElementById("payModalTitle").textContent = modalPaymentIds.length > 1 ? "Mark selected paid" : "Mark paid";
           if (modalPaymentIds.length > 1) {
             document.getElementById("payFor").textContent = `${modalPaymentIds.length} payments selected`;
@@ -313,6 +340,15 @@
           }
           modalMsg("");
           modal.showModal();
+        }
+
+        function openProofModal(paymentId) {
+          const payment = currentPayments.find((item) => item.id === paymentId);
+          proofModalPaymentId = paymentId;
+          document.getElementById("proofOnly").value = "";
+          document.getElementById("proofFor").textContent = `Upload proof for ${payment?.articles?.title || payment?.request_title || "this payment"}.`;
+          proofModalMsg("");
+          proofModal.showModal();
         }
 
         function renderRows(rows) {
@@ -346,8 +382,10 @@
                     p.status === "pending"
                       ? `<button class="secondary" data-pay="${p.id}">Mark paid</button>`
                       : p.proof_url
-                        ? `<a href="${p.proof_url}" target="_blank" rel="noreferrer"><button class="secondary" type="button">Proof</button></a>`
-                        : ""
+                        ? `<a href="${p.proof_url}" target="_blank" rel="noreferrer"><button class="secondary" type="button">Proof</button></a>${paymentProofUploadsActive ? ` <button class="secondary" type="button" data-add-proof="${p.id}">Replace proof</button>` : ""}`
+                        : paymentProofUploadsActive
+                          ? `<button class="secondary" type="button" data-add-proof="${p.id}">Add proof</button>`
+                          : ""
                   }
                 </td>
               </tr>`;
@@ -365,6 +403,10 @@
 
           for (const btn of document.querySelectorAll("button[data-pay]")) {
             btn.onclick = () => openPayModal([btn.getAttribute("data-pay")]);
+          }
+
+          for (const btn of document.querySelectorAll("button[data-add-proof]")) {
+            btn.onclick = () => openProofModal(btn.getAttribute("data-add-proof"));
           }
 
           syncSelectionUi();
@@ -388,6 +430,13 @@
 
         async function refreshAll() {
           await Promise.all([refreshStats(), refreshTrend(), loadPage()]);
+        }
+
+        async function loadWorkspaceStatus() {
+          const res = await fetch("/api/setup/status", { cache: "no-store", credentials: "include" });
+          const body = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(body.error || "Could not inspect workspace settings.");
+          paymentProofUploadsActive = Boolean(body.payment_proof_uploads_active);
         }
 
         async function loadProjects() {
@@ -462,6 +511,31 @@
           }
         };
 
+        document.getElementById("proofConfirm").onclick = async () => {
+          proofModalMsg("");
+          const file = document.getElementById("proofOnly").files[0];
+          if (!file) {
+            proofModalMsg("Choose a proof file first.");
+            return;
+          }
+          try {
+            const fd = new FormData();
+            fd.append("proof", file);
+            const res = await fetch(`${APP_CONFIG.apiBaseUrl}/api/payments/${encodeURIComponent(proofModalPaymentId)}/proof`, {
+              method: "PATCH",
+              body: fd,
+              credentials: "include"
+            });
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(body.error || "Failed");
+            proofModal.close();
+            await refreshAll();
+            msg("Payment proof saved.");
+          } catch (e) {
+            proofModalMsg(e.message || String(e));
+          }
+        };
+
         document.getElementById("project").onchange = async (e) => {
           projectId = e.target.value || "";
           writerId = "";
@@ -520,6 +594,7 @@
         };
 
         try {
+          await loadWorkspaceStatus();
           setMonth(new Date());
           await loadProjects();
           await loadAllWriters();

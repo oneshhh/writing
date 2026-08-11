@@ -6,12 +6,37 @@ const {
   getRuntimeConfigPath,
   hasRuntimeConfigFile,
   loadRuntimeConfigIntoEnv,
+  readRuntimeConfig,
+  sanitizePersistedConfig,
   saveRuntimeConfig
 } = require("../utils/runtimeConfig");
 const { getSupabaseAdmin } = require("../utils/supabase");
 
 const SCHEMA_PATH = path.join(__dirname, "..", "db", "schema.sql");
 const APP_SETUP_CACHE_TTL_MS = 8000;
+const DEFAULT_PAYMENT_PROOF_BUCKET = "payment-proofs";
+const EDITABLE_CONFIG_KEYS = [
+  "APP_NAME",
+  "APP_URL",
+  "CORS_ORIGINS",
+  "SUPABASE_URL",
+  "SUPABASE_ANON_KEY",
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "SUPABASE_JWT_AUD",
+  "DATABASE_URL",
+  "DB_HOST",
+  "DB_PORT",
+  "DB_USER",
+  "DB_PASSWORD",
+  "DB_NAME",
+  "DB_SSL",
+  "HUGGINGFACE_API_TOKEN",
+  "AI_DETECTOR_MODEL",
+  "DEPLOY_TOKEN",
+  "PAYMENT_PROOF_BUCKET",
+  "PAYMENT_PROOF_UPLOADS_ENABLED"
+];
+const SECRET_KEYS = new Set(["SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY", "DB_PASSWORD", "HUGGINGFACE_API_TOKEN", "DEPLOY_TOKEN"]);
 
 let cachedState = null;
 let cachedAt = 0;
@@ -35,6 +60,18 @@ function hasDatabaseConfig() {
       trimOrNull(process.env.DB_PASSWORD) &&
       trimOrNull(process.env.DB_NAME)
   );
+}
+
+function paymentProofBucketName() {
+  return trimOrNull(process.env.PAYMENT_PROOF_BUCKET) || DEFAULT_PAYMENT_PROOF_BUCKET;
+}
+
+function parseBooleanFlag(value) {
+  if (value === undefined || value === null || value === "") return null;
+  const normalized = String(value).trim().toLowerCase();
+  if (["1", "true", "yes", "on", "enabled"].includes(normalized)) return true;
+  if (["0", "false", "no", "off", "disabled"].includes(normalized)) return false;
+  return null;
 }
 
 function buildDatabaseConnectionOptions() {
@@ -92,6 +129,63 @@ async function detectExistingWorkspace() {
     schemaReady: true,
     adminExists: adminCount > 0
   };
+}
+
+async function doesBucketExist(bucketName = paymentProofBucketName()) {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db.storage.listBuckets();
+  if (error) throw new Error(error.message);
+  return Boolean((data || []).find((bucket) => bucket.name === bucketName));
+}
+
+async function createPaymentProofBucket() {
+  const db = getSupabaseAdmin();
+  const bucket = paymentProofBucketName();
+  const exists = await doesBucketExist(bucket);
+  if (exists) return { bucket, created: false };
+  const { error } = await db.storage.createBucket(bucket, {
+    public: true,
+    fileSizeLimit: 5242880,
+    allowedMimeTypes: ["image/png", "image/jpeg", "application/pdf"]
+  });
+  if (error) throw new Error(error.message);
+  invalidateSetupState();
+  return { bucket, created: true };
+}
+
+function readCurrentConfigValues() {
+  loadRuntimeConfigIntoEnv();
+  const persisted = readRuntimeConfig();
+  const current = {};
+  for (const key of EDITABLE_CONFIG_KEYS) {
+    current[key] = persisted[key] ?? process.env[key] ?? null;
+  }
+  return current;
+}
+
+function maskSecretValue(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  if (text.length <= 8) return "Configured";
+  return `${text.slice(0, 4)}...${text.slice(-4)}`;
+}
+
+function buildSettingsPayload() {
+  const current = readCurrentConfigValues();
+  const config = {};
+  const secrets = {};
+  for (const key of EDITABLE_CONFIG_KEYS) {
+    if (SECRET_KEYS.has(key)) {
+      config[key] = "";
+      secrets[key] = {
+        configured: Boolean(trimOrNull(current[key])),
+        masked: maskSecretValue(current[key])
+      };
+      continue;
+    }
+    config[key] = current[key] == null ? "" : String(current[key]);
+  }
+  return { config, secrets };
 }
 
 async function nextAdminUniqueId(db) {
@@ -163,23 +257,6 @@ async function upsertAdminAppUser(db, authUser, fullName) {
   return data;
 }
 
-async function ensureStorageBucket() {
-  const db = getSupabaseAdmin();
-  try {
-    const { error } = await db.storage.createBucket("payment-proofs", {
-      public: true,
-      fileSizeLimit: 5242880,
-      allowedMimeTypes: ["image/png", "image/jpeg", "application/pdf"]
-    });
-    if (error && !String(error.message || "").toLowerCase().includes("already")) throw new Error(error.message);
-    return true;
-  } catch (error) {
-    const message = String(error?.message || "");
-    if (message.toLowerCase().includes("already")) return true;
-    return false;
-  }
-}
-
 async function ensureDatabaseSchema() {
   if (!hasDatabaseConfig()) throw new Error("Missing database connection details.");
   const sql = fs.readFileSync(SCHEMA_PATH, "utf8");
@@ -235,11 +312,26 @@ function buildConfigFromPayload(payload) {
     DB_SSL: trimOrNull(payload.db_ssl),
     HUGGINGFACE_API_TOKEN: trimOrNull(payload.huggingface_api_token),
     AI_DETECTOR_MODEL: trimOrNull(payload.ai_detector_model),
-    DEPLOY_TOKEN: trimOrNull(payload.deploy_token)
+    DEPLOY_TOKEN: trimOrNull(payload.deploy_token),
+    PAYMENT_PROOF_BUCKET: trimOrNull(payload.payment_proof_bucket) || trimOrNull(process.env.PAYMENT_PROOF_BUCKET) || DEFAULT_PAYMENT_PROOF_BUCKET
   };
+
+  if (Object.prototype.hasOwnProperty.call(payload || {}, "payment_proof_uploads_enabled")) {
+    const parsed = parseBooleanFlag(payload.payment_proof_uploads_enabled);
+    if (parsed !== null) config.PAYMENT_PROOF_UPLOADS_ENABLED = String(parsed);
+  }
 
   if (!config.CORS_ORIGINS && config.APP_URL) config.CORS_ORIGINS = config.APP_URL;
   return config;
+}
+
+function mergeConfigFromPayload(payload, existingConfig) {
+  const merged = { ...sanitizePersistedConfig(existingConfig || {}) };
+  const next = buildConfigFromPayload(payload || {});
+  for (const [key, value] of Object.entries(next)) {
+    if (value !== undefined && value !== null && value !== "") merged[key] = value;
+  }
+  return merged;
 }
 
 function validateConfig(config) {
@@ -261,6 +353,14 @@ async function configureApplication(payload) {
   loadRuntimeConfigIntoEnv({ overwrite: true });
   await ensureAppReady({ refresh: true });
   return config;
+}
+
+async function updateApplicationSettings(payload) {
+  const merged = mergeConfigFromPayload(payload, readCurrentConfigValues());
+  saveRuntimeConfig(merged);
+  loadRuntimeConfigIntoEnv({ overwrite: true });
+  invalidateSetupState();
+  return await getSetupState({ refresh: true });
 }
 
 async function maybeBootstrapAdminFromEnv() {
@@ -290,6 +390,9 @@ async function computeSetupState() {
   let adminExists = false;
   let storageReady = false;
   let existingWorkspaceDetected = false;
+  let paymentProofBucketExists = false;
+  let paymentProofUploadsEnabled = false;
+  let paymentProofUploadsActive = false;
 
   if (!supabaseConfigured) issues.push("Supabase credentials are missing.");
 
@@ -329,11 +432,16 @@ async function computeSetupState() {
     }
 
     try {
-      storageReady = await ensureStorageBucket();
+      paymentProofBucketExists = await doesBucketExist();
+      storageReady = paymentProofBucketExists;
     } catch {
       storageReady = false;
     }
   }
+
+  const paymentProofFlag = parseBooleanFlag(process.env.PAYMENT_PROOF_UPLOADS_ENABLED);
+  paymentProofUploadsEnabled = paymentProofFlag == null ? paymentProofBucketExists : paymentProofFlag;
+  paymentProofUploadsActive = Boolean(paymentProofUploadsEnabled && paymentProofBucketExists);
 
   return {
     app_name: trimOrNull(process.env.APP_NAME) || "Real Write",
@@ -345,6 +453,10 @@ async function computeSetupState() {
     existing_workspace_detected: existingWorkspaceDetected,
     schema_ready: schemaReady,
     storage_ready: storageReady,
+    payment_proof_bucket: paymentProofBucketName(),
+    payment_proof_bucket_exists: paymentProofBucketExists,
+    payment_proof_uploads_enabled: paymentProofUploadsEnabled,
+    payment_proof_uploads_active: paymentProofUploadsActive,
     admin_exists: adminExists,
     ready: supabaseConfigured && schemaReady && adminExists,
     setup_locked: supabaseConfigured && schemaReady && adminExists,
@@ -373,7 +485,6 @@ async function ensureAppReady({ refresh = false } = {}) {
     loadRuntimeConfigIntoEnv();
     if (hasSupabaseConfig() && hasDatabaseConfig()) {
       await ensureDatabaseSchema();
-      await ensureStorageBucket();
       await maybeBootstrapAdminFromEnv();
     }
     const state = await getSetupState({ refresh: true });
@@ -389,8 +500,11 @@ async function ensureAppReady({ refresh = false } = {}) {
 
 module.exports = {
   bootstrapAdmin,
+  buildSettingsPayload,
   configureApplication,
+  createPaymentProofBucket,
   ensureAppReady,
   getSetupState,
-  invalidateSetupState
+  invalidateSetupState,
+  updateApplicationSettings
 };
