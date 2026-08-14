@@ -21,6 +21,7 @@
             <thead><tr><th>Title</th><th>Body</th><th>When</th><th></th><th></th></tr></thead>
             <tbody id="rows"></tbody>
           </table>
+          <div class="muted hidden" id="msg" style="margin-top:12px"></div>
         </div>
       </div>
     </div>
@@ -29,8 +30,19 @@
         const user = await APP.requireRole("writer");
         if (!user) return;
         await renderTopbar({ role: user.role, links: [{ href: `/${user.role}/dashboard.html`, label: "Dashboard" }] });
-        let lastSignature = "";
+        let lastSignature = null;
         let lastUnread = null;
+        const rows = document.getElementById("rows");
+        const msg = document.getElementById("msg");
+
+        function setMessage(text) {
+          msg.textContent = text || "";
+          msg.classList.toggle("hidden", !text);
+        }
+
+        function renderEmpty(text) {
+          rows.innerHTML = `<tr><td colspan="5" class="muted" style="padding:18px;">${APP.escapeHtml(text)}</td></tr>`;
+        }
 
         function notificationHref(n) {
           const articleId = n?.payload?.article_id;
@@ -62,7 +74,11 @@
         }
 
         function renderRows(notifications) {
-          document.getElementById("rows").innerHTML = (notifications || [])
+          if (!notifications?.length) {
+            renderEmpty("No notifications yet.");
+            return;
+          }
+          rows.innerHTML = (notifications || [])
             .map((n) => {
               const href = notificationHref(n);
               return `<tr>
@@ -93,13 +109,22 @@
         }
 
         async function refresh(silent) {
-          if (!silent) APP.ui.tableSkeleton("rows", { rows: 10, cols: 5 });
+          if (!silent) {
+            setMessage("");
+            APP.ui.tableSkeleton("rows", { rows: 10, cols: 5 });
+          }
           const data = await APP.apiFetch("/api/notifications");
           const notifications = data.notifications || [];
           const signature = notifications.map((n) => `${n.id}:${n.read ? 1 : 0}`).join("|");
           const unread = notifications.filter((n) => !n.read).length;
           if (signature !== lastSignature) {
             renderRows(notifications);
+          }
+          if (data.unavailable) {
+            renderEmpty("Notifications are not available for this workspace yet.");
+            setMessage("Notifications will start appearing here after the notifications table is available.");
+          } else if (!notifications.length) {
+            setMessage("No notifications yet.");
           }
           if (silent && lastUnread != null && unread > lastUnread) {
             APP.ui?.toast?.(`${unread - lastUnread} new notification${unread - lastUnread === 1 ? "" : "s"}`, {
@@ -110,7 +135,12 @@
           lastSignature = signature;
           lastUnread = unread;
         }
-        await refresh();
+        try {
+          await refresh();
+        } catch (error) {
+          renderEmpty("Could not load notifications right now.");
+          setMessage(error.message || String(error));
+        }
         if (window.__rwNotificationsPagePoll) clearInterval(window.__rwNotificationsPagePoll);
         window.__rwNotificationsPagePoll = setInterval(() => {
           refresh(true).catch(() => {});

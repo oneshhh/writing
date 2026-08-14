@@ -1,5 +1,6 @@
 const express = require("express");
 const { getSupabaseAdmin } = require("../utils/supabase");
+const { isMissingNotificationsTableError } = require("../utils/notificationSupport");
 
 const router = express.Router();
 
@@ -11,7 +12,12 @@ router.get("/", async (req, res) => {
     .eq("user_id", req.auth.user.id)
     .order("created_at", { ascending: false })
     .limit(100);
-  if (error) return res.status(400).json({ error: error.message });
+  if (error) {
+    if (isMissingNotificationsTableError(error)) {
+      return res.json({ notifications: [], unavailable: true });
+    }
+    return res.status(400).json({ error: error.message });
+  }
   return res.json({ notifications: data });
 });
 
@@ -22,7 +28,12 @@ router.get("/unread-count", async (req, res) => {
     .select("id", { count: "exact", head: true })
     .eq("user_id", req.auth.user.id)
     .eq("read", false);
-  if (error) return res.status(400).json({ error: error.message });
+  if (error) {
+    if (isMissingNotificationsTableError(error)) {
+      return res.json({ unread: 0, unavailable: true });
+    }
+    return res.status(400).json({ error: error.message });
+  }
   return res.json({ unread: Number(count || 0) });
 });
 
@@ -36,7 +47,12 @@ router.patch("/:id/read", async (req, res) => {
     .eq("user_id", req.auth.user.id)
     .select("*")
     .single();
-  if (error) return res.status(400).json({ error: error.message });
+  if (error) {
+    if (isMissingNotificationsTableError(error)) {
+      return res.json({ notification: null, unavailable: true });
+    }
+    return res.status(400).json({ error: error.message });
+  }
   return res.json({ notification: data });
 });
 
